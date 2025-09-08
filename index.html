@@ -1,565 +1,344 @@
 <!DOCTYPE html>
-<html lang="uk" class="scroll-smooth">
+<html lang="uk">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>index.html</title>
-    <!-- Tailwind CSS CDN -->
+    <title>Чат-бот на основі Gemini</title>
+    <!-- Tailwind CSS CDN для стилізації -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Шрифт Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #f0f2f5;
-            background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100"><rect width="100" height="50" fill="%23FFD700"/><rect y="50" width="100" height="50" fill="%230057B8"/></svg>');
-            background-repeat: repeat;
+            background-color: #f3f4f6;
         }
-        .product-card {
-            transition: transform 0.2s, box-shadow 0.2s;
-            background-color: rgba(255, 255, 255, 0.95);
+        .chat-container {
+            max-width: 600px;
+            height: 80vh;
+            display: flex;
+            flex-direction: column;
+            border-radius: 1.5rem;
+            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
         }
-        .product-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        .chat-box {
+            flex: 1;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            padding: 1.5rem;
+            background-color: #ffffff;
         }
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 1000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.6);
-            backdrop-filter: blur(5px);
-            align-items: center;
+        .message-bubble {
+            max-width: 85%;
+            padding: 0.75rem 1.25rem;
+            border-radius: 1.5rem;
+            word-wrap: break-word;
+        }
+        .user-message {
+            background-color: #1a73e8;
+            color: #ffffff;
+            align-self: flex-end;
+            border-bottom-right-radius: 0.5rem;
+        }
+        .bot-message {
+            background-color: #e5e7eb;
+            color: #1f2937;
+            align-self: flex-start;
+            border-bottom-left-radius: 0.5rem;
+        }
+        .loading-dots {
+            display: flex;
             justify-content: center;
+            align-items: center;
         }
-        .modal-content {
-            background-color: #fff;
-            padding: 2.5rem;
-            border-radius: 1rem;
-            max-width: 90%;
-            width: 500px;
-            box-shadow: 0 8px 30px rgba(0,0,0,0.1);
-            animation: fadeIn 0.3s ease-in-out;
+        .loading-dot {
+            width: 8px;
+            height: 8px;
+            background-color: #6b7280;
+            border-radius: 50%;
+            margin: 0 4px;
+            animation: bounce 0.6s infinite alternate;
         }
-        @keyframes fadeIn {
-            from { opacity: 0; transform: scale(0.95); }
-            to { opacity: 1; transform: scale(1); }
+        .loading-dot:nth-child(2) {
+            animation-delay: 0.2s;
         }
-        .close-button {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            transition: color 0.2s;
-            cursor: pointer;
+        .loading-dot:nth-child(3) {
+            animation-delay: 0.4s;
         }
-        .close-button:hover, .close-button:focus {
-            color: #333;
+        @keyframes bounce {
+            from {
+                transform: translateY(0);
+            }
+            to {
+                transform: translateY(-8px);
+            }
         }
-        .gradient-text {
-            background-clip: text;
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+        .spinner {
+            border: 4px solid rgba(0, 0, 0, 0.1);
+            border-left-color: #1a73e8;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
     </style>
 </head>
-<body class="bg-gray-100 text-gray-800 flex flex-col min-h-screen">
+<body class="bg-gray-100 p-4 sm:p-8 flex items-center justify-center min-h-screen">
 
-<!-- Firebase libraries -->
-<script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-    import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-    import { getFirestore, collection, addDoc, onSnapshot, query, where, doc, deleteDoc, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+    <!-- Головний контейнер чату -->
+    <div class="chat-container bg-white rounded-3xl overflow-hidden shadow-2xl w-full">
 
-    setLogLevel('Debug');
+        <!-- Заголовок та ID користувача -->
+        <div class="p-6 bg-blue-600 text-white text-center rounded-t-3xl">
+            <h1 class="text-3xl font-bold">Чат-бот Gemini</h1>
+            <p id="user-id-display" class="mt-2 text-sm text-blue-200">ID користувача: Завантаження...</p>
+        </div>
 
-    let db;
-    let auth;
-    let appId;
-    let userId = null;
+        <!-- Контейнер для повідомлень -->
+        <div id="chat-box" class="chat-box">
+            <!-- Повідомлення будуть додаватися сюди динамічно -->
+        </div>
 
-    const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-    const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-    appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        <!-- Індикатор завантаження -->
+        <div id="loading-indicator" class="hidden flex justify-center p-4">
+            <div class="spinner"></div>
+        </div>
 
-    const productsList = document.getElementById('products-list');
-    const myProductsList = document.getElementById('my-products-list');
-    const productsView = document.getElementById('products-view');
-    const myProductsView = document.getElementById('my-products-view');
-    const userIdDisplay = document.getElementById('user-id-display');
-    const loadingIndicator = document.getElementById('loading-indicator');
-    const addProductForm = document.getElementById('add-product-form');
-    const addProductModal = document.getElementById('add-product-modal');
-    const closeModalButton = document.querySelector('.close-button');
-    const messageModal = document.getElementById('message-modal');
-    const messageText = document.getElementById('message-text');
-    const closeMessageButton = document.getElementById('close-message-button');
-    
-    let currentView = 'all';
+        <!-- Поле вводу та кнопка відправки -->
+        <div class="p-4 bg-gray-100 flex items-center gap-4 rounded-b-3xl">
+            <input type="text" id="message-input" placeholder="Введіть ваше повідомлення..."
+                   class="flex-1 p-3 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200" />
+            <button id="send-button" class="bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-all duration-200 active:scale-95">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                    <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.945a.75.75 0 00.926.94L16.5 12l-10.076 3.615a.75.75 0 00-.926.94l2.432 7.945a.75.75 0 00.926.94 24.387 24.387 0 006.89-2.083 24.387 24.387 0 006.89-2.083a.75.75 0 00.926-.94l-2.432-7.945a.75.75 0 00-.926-.94l-10.076-3.615z" />
+                </svg>
+            </button>
+        </div>
+    </div>
 
-    // Show/hide loading indicator
-    function showLoading() {
-        loadingIndicator.classList.remove('hidden');
-    }
+    <!-- Модальне вікно для повідомлень про помилки -->
+    <div id="error-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4">
+        <div class="bg-white p-6 rounded-lg shadow-xl text-center">
+            <h2 class="text-xl font-bold text-red-600 mb-4">Помилка</h2>
+            <p id="error-message" class="text-gray-700 mb-6"></p>
+            <button id="close-modal" class="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition-colors">Закрити</button>
+        </div>
+    </div>
 
-    function hideLoading() {
-        loadingIndicator.classList.add('hidden');
-    }
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, getDoc, setDoc, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-    // Custom message modal
-    function showMessage(message) {
-        messageText.textContent = message;
-        messageModal.style.display = 'flex';
-    }
+        // Важливо: ці змінні надаються середовищем Canvas.
+        // Не змінюйте їх.
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
 
-    function hideMessage() {
-        messageModal.style.display = 'none';
-    }
+        // Встановлення рівня логування для відладки
+        setLogLevel('debug');
 
-    closeMessageButton.addEventListener('click', hideMessage);
-
-    // Initialise Firebase and authenticate user
-    try {
+        // Ініціалізація Firebase
         const app = initializeApp(firebaseConfig);
-        db = getFirestore(app);
-        auth = getAuth(app);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
 
+        // Посилання на елементи DOM
+        const chatBox = document.getElementById('chat-box');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const loadingIndicator = document.getElementById('loading-indicator');
+        const userIdDisplay = document.getElementById('user-id-display');
+        const errorModal = document.getElementById('error-modal');
+        const errorMessage = document.getElementById('error-message');
+        const closeModalButton = document.getElementById('close-modal');
+
+        let isAuthReady = false;
+        let userId = '';
+        const privateUserCollectionPath = `/artifacts/${appId}/users`;
+        const publicCollectionPath = `/artifacts/${appId}/public/data`;
+
+        // Функція для показу модального вікна з помилкою
+        function showModal(message) {
+            errorMessage.textContent = message;
+            errorModal.classList.remove('hidden');
+        }
+
+        closeModalButton.addEventListener('click', () => {
+            errorModal.classList.add('hidden');
+        });
+
+        // Ініціалізація автентифікації користувача
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 userId = user.uid;
                 userIdDisplay.textContent = `Ваш ID: ${userId}`;
-                console.log("User authenticated with ID:", userId);
-                // Listen for all products and the user's products
-                listenForProducts();
-                listenForMyProducts();
             } else {
-                userId = crypto.randomUUID(); // For anonymous user, use a temporary ID
-                userIdDisplay.textContent = `Ваш ID: ${userId}`;
-                console.log("User signed in anonymously with temp ID:", userId);
-                // Listen only for all products for non-authenticated users
-                listenForProducts();
+                try {
+                    await signInAnonymously(auth);
+                    userId = auth.currentUser.uid;
+                    userIdDisplay.textContent = `Ваш ID: ${userId}`;
+                } catch (error) {
+                    console.error("Помилка анонімної автентифікації:", error);
+                    showModal('Не вдалося автентифікувати користувача. Будь ласка, спробуйте пізніше.');
+                }
+            }
+            isAuthReady = true;
+            if (isAuthReady && userId) {
+                setupChatListener();
+            }
+        });
+
+        if (initialAuthToken) {
+            signInWithCustomToken(auth, initialAuthToken).catch(error => {
+                console.error("Помилка автентифікації:", error);
+                showModal('Не вдалося автентифікувати користувача. Будь ласка, спробуйте пізніше.');
+            });
+        }
+
+        // Функція для відображення повідомлення в чаті
+        function displayMessage(text, sender) {
+            const messageWrapper = document.createElement('div');
+            messageWrapper.classList.add('flex', sender === 'user' ? 'justify-end' : 'justify-start');
+
+            const messageBubble = document.createElement('div');
+            messageBubble.classList.add('message-bubble', sender === 'user' ? 'user-message' : 'bot-message');
+            messageBubble.textContent = text;
+            
+            messageWrapper.appendChild(messageBubble);
+            chatBox.appendChild(messageWrapper);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // Функція для отримання відповіді від API
+        async function getBotResponse(message) {
+            const userQuery = message;
+            const systemPrompt = "Ти — дружній та корисний чат-бот, створений для відповідей на запитання. Відповідай українською мовою. Намагайся бути лаконічним, але інформативним.";
+            const apiKey = ""; // Ключ API залишається пустим, він надається середовищем.
+            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                tools: [{ "google_search": {} }],
+                systemInstruction: {
+                    parts: [{ text: systemPrompt }]
+                }
+            };
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    console.error('Помилка API:', errorData);
+                    throw new Error(`Помилка API: ${response.status} ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                const candidate = result.candidates?.[0];
+                if (candidate && candidate.content?.parts?.[0]?.text) {
+                    return candidate.content.parts[0].text;
+                } else {
+                    console.error("Відповідь API не містить тексту:", result);
+                    throw new Error("Відповідь API не містить тексту.");
+                }
+            } catch (error) {
+                console.error('Помилка при отриманні відповіді від бота:', error);
+                // Перевіряємо, чи це 401 помилка автентифікації
+                if (error.message.includes('401')) {
+                    showModal("Помилка автентифікації: Не вдалося з'єднатися з сервісом. Перевірте свій ключ API.");
+                } else {
+                    showModal("Помилка: Не вдалося отримати відповідь. Будь ласка, спробуйте ще раз.");
+                }
+                return 'На жаль, не можу зараз відповісти. Сталася помилка.';
+            }
+        }
+
+        // Функція для відправки повідомлення
+        async function sendMessage() {
+            const messageText = messageInput.value.trim();
+            if (!messageText || !userId) {
+                console.error("Повідомлення пусте або userId не доступний.");
+                return;
+            }
+
+            // Створюємо шлях до колекції для приватних повідомлень
+            const messagesCollection = collection(db, `${privateUserCollectionPath}/${userId}/messages`);
+
+            // Відображаємо повідомлення користувача одразу
+            displayMessage(messageText, 'user');
+            messageInput.value = '';
+            
+            // Зберігаємо повідомлення користувача у Firestore
+            await addDoc(messagesCollection, {
+                text: messageText,
+                sender: 'user',
+                timestamp: serverTimestamp()
+            });
+
+            // Показуємо індикатор завантаження
+            loadingIndicator.classList.remove('hidden');
+            chatBox.scrollTop = chatBox.scrollHeight;
+
+            const botResponse = await getBotResponse(messageText);
+            
+            // Ховаємо індикатор завантаження
+            loadingIndicator.classList.add('hidden');
+
+            // Відображаємо відповідь бота
+            displayMessage(botResponse, 'bot');
+            
+            // Зберігаємо відповідь бота у Firestore
+            await addDoc(messagesCollection, {
+                text: botResponse,
+                sender: 'bot',
+                timestamp: serverTimestamp()
+            });
+        }
+
+        // Слухачі подій
+        sendButton.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
             }
         });
         
-        if (initialAuthToken) {
-            await signInWithCustomToken(auth, initialAuthToken);
-        } else {
-            await signInAnonymously(auth);
-        }
-
-    } catch (e) {
-        console.error("Error initializing Firebase:", e);
-        showMessage("Виникла помилка під час ініціалізації. Перезавантажте сторінку.");
-    }
-
-    // Render products on the page
-    function renderProducts(products, container) {
-        container.innerHTML = '';
-        if (products.length === 0) {
-            container.innerHTML = `<p class="text-center text-gray-500 text-lg">Немає оголошень для відображення.</p>`;
-            return;
-        }
-        products.forEach(product => {
-            const productCard = document.createElement('div');
-            productCard.className = 'product-card bg-white rounded-xl shadow-md p-6 flex flex-col sm:flex-row items-center sm:items-start text-center sm:text-left space-y-4 sm:space-y-0 sm:space-x-6';
-            productCard.innerHTML = `
-                <img class="w-full sm:w-1/4 h-auto object-cover rounded-xl" src="${product.imageUrl}" alt="${product.title}">
-                <div class="flex-grow flex flex-col justify-between">
-                    <div>
-                        <h2 class="text-2xl font-bold mb-2 text-gray-900">${product.title}</h2>
-                        <p class="text-gray-600 mb-4">${product.description}</p>
-                        <div class="flex items-center justify-center sm:justify-start mb-4">
-                            <span class="text-xl font-bold text-gray-900 mr-2">Ціна:</span>
-                            <span class="text-3xl font-extrabold text-purple-600">$${product.price}</span>
-                        </div>
-                    </div>
-                    <div class="mt-auto w-full flex flex-col sm:flex-row justify-center sm:justify-end items-center space-y-2 sm:space-y-0 sm:space-x-4">
-                        <span class="text-sm text-gray-500">Опубліковано: ${product.createdAt ? new Date(product.createdAt.seconds * 1000).toLocaleDateString() : 'Невідомо'}</span>
-                        ${product.userId === userId ? `
-                            <button class="delete-button bg-red-500 text-white font-semibold py-2 px-6 rounded-full hover:bg-red-600 transition-colors focus:outline-none focus:ring-2 focus:ring-red-400 focus:ring-opacity-50" data-id="${product.id}">
-                                Видалити
-                            </button>
-                        ` : `
-                            <button class="buy-button bg-purple-600 text-white font-semibold py-2 px-6 rounded-full hover:bg-purple-700 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50" data-id="${product.id}">
-                                Зателефонувати
-                            </button>
-                        `}
-                    </div>
-                    <!-- Comments section -->
-                    <div class="mt-8 w-full">
-                        <h3 class="text-xl font-bold mb-4 text-gray-800">Коментарі</h3>
-                        <div id="comments-${product.id}" class="space-y-4">
-                            <!-- Comments will be rendered here -->
-                        </div>
-                        <form class="add-comment-form mt-4" data-product-id="${product.id}">
-                            <div class="flex items-center space-x-2">
-                                <input type="text" placeholder="Залишити коментар..." required class="comment-input flex-grow block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 p-2">
-                                <button type="submit" class="bg-gray-700 text-white font-semibold py-2 px-4 rounded-full hover:bg-gray-800 transition-colors">
-                                    Надіслати
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            `;
-            container.appendChild(productCard);
-            listenForComments(product.id);
-        });
-
-        // Add event listeners for delete buttons
-        document.querySelectorAll('.delete-button').forEach(button => {
-            button.addEventListener('click', (e) => {
-                const docId = e.target.dataset.id;
-                if (docId) {
-                    deleteProduct(docId);
-                }
-            });
-        });
-
-        // Add event listeners for buy buttons
-        document.querySelectorAll('.buy-button').forEach(button => {
-            button.addEventListener('click', () => {
-                showMessage("Наразі ця функція є демонстраційною.");
-            });
-        });
-
-        // Add event listeners for comment forms
-        document.querySelectorAll('.add-comment-form').forEach(form => {
-            form.addEventListener('submit', async (e) => {
-                e.preventDefault();
-                const productId = e.target.dataset.productId;
-                const commentInput = e.target.querySelector('.comment-input');
-                const commentText = commentInput.value.trim();
-
-                if (commentText) {
-                    addComment(productId, commentText);
-                    commentInput.value = '';
-                }
-            });
-        });
-    }
-
-    // Function to render comments for a specific product
-    function renderComments(comments, containerId) {
-        const container = document.getElementById(containerId);
-        if (!container) return;
-
-        container.innerHTML = '';
-        if (comments.length === 0) {
-            container.innerHTML = `<p class="text-gray-500 text-sm">Коментарів поки немає.</p>`;
-            return;
-        }
-
-        comments.forEach(comment => {
-            const commentElement = document.createElement('div');
-            commentElement.className = 'bg-gray-100 p-3 rounded-lg flex items-center space-x-3';
-            commentElement.innerHTML = `
-                <div class="flex-shrink-0 w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center text-sm font-bold text-gray-700">
-                    ${comment.userId.substring(0, 2).toUpperCase()}
-                </div>
-                <div class="flex-grow">
-                    <p class="font-semibold text-gray-700">Користувач ${comment.userId.substring(0, 8)}...</p>
-                    <p class="text-gray-600 text-sm">${comment.text}</p>
-                </div>
-            `;
-            container.appendChild(commentElement);
-        });
-    }
-
-    // Listen for comments in real-time
-    function listenForComments(productId) {
-        if (!db) return;
-        const commentsCollectionRef = collection(db, `artifacts/${appId}/public/data/products/${productId}/comments`);
-        const q = query(commentsCollectionRef);
-        onSnapshot(q, (snapshot) => {
-            const comments = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
-            comments.sort((a, b) => a.createdAt.seconds - b.createdAt.seconds);
-            renderComments(comments, `comments-${productId}`);
-        }, (error) => {
-            console.error("Error getting comments:", error);
-        });
-    }
-
-    // Add a new comment to a product
-    async function addComment(productId, text) {
-        if (!db || !userId || !productId) {
-            showMessage("Ви не можете залишити коментар.");
-            return;
-        }
-
-        const newComment = {
-            userId: userId,
-            text: text,
-            createdAt: new Date()
-        };
-
-        try {
-            const commentsCollectionRef = collection(db, `artifacts/${appId}/public/data/products/${productId}/comments`);
-            await addDoc(commentsCollectionRef, newComment);
-        } catch (e) {
-            console.error("Error adding comment: ", e);
-            showMessage("Виникла помилка під час додавання коментаря.");
-        }
-    }
-
-    // Listen for all products in real-time
-    function listenForProducts() {
-        if (!db) { return; }
-        const productsCollectionRef = collection(db, `artifacts/${appId}/public/data/products`);
-        showLoading();
-        onSnapshot(productsCollectionRef, (snapshot) => {
-            hideLoading();
-            const products = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
-            products.sort((a, b) => b.createdAt.seconds - a.createdAt.seconds);
-            if (currentView === 'all') {
-                renderProducts(products, productsList);
+        // Слухач Firestore для оновлення чату в реальному часі
+        function setupChatListener() {
+            if (!userId) {
+                console.error("userId не доступний для налаштування слухача чату.");
+                return;
             }
-            console.log("All products updated:", products);
-        }, (error) => {
-            hideLoading();
-            console.error("Error getting products:", error);
-            showMessage("Не вдалося завантажити оголошення. Спробуйте пізніше.");
-        });
-    }
+            
+            const messagesCollection = collection(db, `${privateUserCollectionPath}/${userId}/messages`);
+            const messagesQuery = query(messagesCollection, orderBy('timestamp'));
 
-    // Listen for current user's products in real-time
-    function listenForMyProducts() {
-        if (!db || !userId) { return; }
-        const productsCollectionRef = collection(db, `artifacts/${appId}/public/data/products`);
-        const q = query(productsCollectionRef, where("userId", "==", userId));
-        showLoading();
-        onSnapshot(q, (snapshot) => {
-            hideLoading();
-            const myProducts = snapshot.docs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            }));
-            myProducts.sort((a, b) => b.createdAt.seconds - a.createdAt.seconds);
-            if (currentView === 'my') {
-                renderProducts(myProducts, myProductsList);
-            }
-            console.log("My products updated:", myProducts);
-        }, (error) => {
-            hideLoading();
-            console.error("Error getting my products:", error);
-        });
-    }
-
-    // Handle adding a new product
-    addProductForm.addEventListener('submit', async (e) => {
-        e.preventDefault();
-        if (!db || !userId) {
-            showMessage("Ви не авторизовані для додавання оголошень.");
-            return;
+            onSnapshot(messagesQuery, (snapshot) => {
+                chatBox.innerHTML = ''; // Очищаємо чат перед відображенням
+                snapshot.forEach(doc => {
+                    const message = doc.data();
+                    displayMessage(message.text, message.sender);
+                });
+            }, (error) => {
+                console.error("Помилка при отриманні історії чату:", error);
+                // Оскільки правила безпеки тепер правильні, ця помилка не повинна виникати
+                showModal('Не вдалося завантажити історію чату. Будь ласка, перевірте з\'єднання.');
+            });
         }
-
-        const title = document.getElementById('product-title').value.trim();
-        const description = document.getElementById('product-description').value.trim();
-        const price = parseFloat(document.getElementById('product-price').value.trim());
-        const imageUrl = document.getElementById('product-image-url').value.trim();
-
-        if (!title || !description || isNaN(price) || price <= 0) {
-            showMessage("Будь ласка, заповніть всі поля коректно.");
-            return;
-        }
-
-        const newProduct = {
-            title,
-            description,
-            price,
-            userId,
-            imageUrl: imageUrl || "https://placehold.co/400x300/a0a0a0/fff?text=No+Image",
-            createdAt: new Date()
-        };
-
-        try {
-            showLoading();
-            const productsCollectionRef = collection(db, `artifacts/${appId}/public/data/products`);
-            await addDoc(productsCollectionRef, newProduct);
-            addProductForm.reset();
-            hideModal(addProductModal);
-            showMessage("Оголошення успішно додано!");
-        } catch (e) {
-            console.error("Error adding document: ", e);
-            showMessage("Виникла помилка під час додавання оголошення. Спробуйте ще раз.");
-        } finally {
-            hideLoading();
-        }
-    });
-
-    // Handle deleting a product
-    async function deleteProduct(docId) {
-        if (!db || !userId || !docId) {
-            showMessage("Ви не можете видалити це оголошення.");
-            return;
-        }
-
-        const docRef = doc(db, `artifacts/${appId}/public/data/products`, docId);
-
-        try {
-            showLoading();
-            await deleteDoc(docRef);
-            showMessage("Оголошення успішно видалено!");
-        } catch (e) {
-            console.error("Error deleting document:", e);
-            showMessage("Виникла помилка під час видалення.");
-        } finally {
-            hideLoading();
-        }
-    }
-
-    // Modal functions
-    function showModal(modalElement) {
-        modalElement.style.display = 'flex';
-    }
-
-    function hideModal(modalElement) {
-        modalElement.style.display = 'none';
-    }
-
-    document.getElementById('open-add-modal').addEventListener('click', () => {
-        showModal(addProductModal);
-    });
-
-    closeModalButton.addEventListener('click', () => {
-        hideModal(addProductModal);
-    });
-
-    // Close modal on outside click
-    window.addEventListener('click', (e) => {
-        if (e.target === addProductModal) {
-            hideModal(addProductModal);
-        }
-    });
-
-    // Handle view switching
-    document.getElementById('show-all-products').addEventListener('click', () => {
-        currentView = 'all';
-        productsView.classList.remove('hidden');
-        myProductsView.classList.add('hidden');
-        document.getElementById('show-all-products').classList.add('bg-gray-200');
-        document.getElementById('show-my-products').classList.remove('bg-gray-200');
-    });
-
-    document.getElementById('show-my-products').addEventListener('click', () => {
-        currentView = 'my';
-        productsView.classList.add('hidden');
-        myProductsView.classList.remove('hidden');
-        document.getElementById('show-my-products').classList.add('bg-gray-200');
-        document.getElementById('show-all-products').classList.remove('bg-gray-200');
-    });
-
-</script>
-
-<!-- Main content section -->
-<div class="flex-grow">
-    <!-- Header -->
-    <header class="bg-white shadow-sm sticky top-0 z-50">
-        <div class="container mx-auto px-6 py-4 flex flex-col sm:flex-row items-center justify-between flex-wrap">
-            <div class="text-4xl font-extrabold text-gray-900 text-center sm:text-left">
-                <span class="bg-yellow-400 bg-opacity-80 px-2 rounded-lg text-purple-800">Оголошення Рокитнівщини</span>
-            </div>
-            <div class="flex items-center space-x-4 mt-4 sm:mt-0">
-                <span id="user-id-display" class="text-sm font-semibold text-gray-600">Ваш ID: Завантаження...</span>
-                <button id="open-add-modal" class="bg-purple-600 text-white font-semibold py-2 px-4 rounded-full hover:bg-purple-700 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50">
-                    + Додати оголошення
-                </button>
-            </div>
-        </div>
-    </header>
-
-    <!-- Navigation for different views -->
-    <div class="container mx-auto px-6 py-4 flex justify-center space-x-4 my-8">
-        <button id="show-all-products" class="px-6 py-2 rounded-full font-semibold text-gray-700 transition-colors bg-gray-200">
-            Всі оголошення
-        </button>
-        <button id="show-my-products" class="px-6 py-2 rounded-full font-semibold text-gray-700 transition-colors hover:bg-gray-200">
-            Мої оголошення
-        </button>
-    </div>
-
-    <!-- Main product list -->
-    <main class="container mx-auto px-6 py-4">
-        <div id="loading-indicator" class="hidden text-center my-8 text-gray-500">
-            <svg class="animate-spin h-8 w-8 text-gray-400 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            <p>Завантаження оголошень...</p>
-        </div>
-
-        <!-- All Products View -->
-        <div id="products-view">
-            <div id="products-list" class="flex flex-col space-y-4">
-                <!-- Products will be rendered here by JavaScript -->
-            </div>
-        </div>
-
-        <!-- My Products View -->
-        <div id="my-products-view" class="hidden">
-            <div id="my-products-list" class="flex flex-col space-y-4">
-                <!-- User's products will be rendered here by JavaScript -->
-            </div>
-        </div>
-
-    </main>
-</div>
-
-<!-- Footer -->
-<footer class="bg-gray-800 text-white py-8 mt-12">
-    <div class="container mx-auto px-6 text-center">
-        <p class="text-sm">&copy; 2025 Мій Клон OLX. Усі права захищені.</p>
-    </div>
-</footer>
-
-<!-- Add Product Modal -->
-<div id="add-product-modal" class="modal">
-    <div class="modal-content">
-        <span class="close-button">&times;</span>
-        <h2 class="text-2xl font-bold mb-6">Створити оголошення</h2>
-        <form id="add-product-form" class="space-y-4">
-            <div>
-                <label for="product-title" class="block text-sm font-medium text-gray-700">Назва товару</label>
-                <input type="text" id="product-title" name="product-title" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 p-2">
-            </div>
-            <div>
-                <label for="product-description" class="block text-sm font-medium text-gray-700">Опис</label>
-                <textarea id="product-description" name="product-description" rows="3" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 p-2"></textarea>
-            </div>
-            <div>
-                <label for="product-price" class="block text-sm font-medium text-gray-700">Ціна ($)</label>
-                <input type="number" id="product-price" name="product-price" step="0.01" required class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 p-2">
-            </div>
-            <div>
-                <label for="product-image-url" class="block text-sm font-medium text-gray-700">URL зображення (необов'язково)</label>
-                <input type="url" id="product-image-url" name="product-image-url" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-purple-500 focus:ring-purple-500 p-2">
-            </div>
-            <button type="submit" class="w-full mt-4 bg-purple-600 text-white font-semibold py-2 px-4 rounded-full hover:bg-purple-700 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50">
-                Опублікувати
-            </button>
-        </form>
-    </div>
-</div>
-
-<!-- Message Modal -->
-<div id="message-modal" class="modal">
-    <div class="modal-content">
-        <h2 class="text-2xl font-bold mb-4">Повідомлення</h2>
-        <p id="message-text" class="text-lg text-gray-700 mb-6"></p>
-        <button id="close-message-button" class="w-full bg-purple-600 text-white font-semibold py-2 px-4 rounded-full hover:bg-purple-700 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-opacity-50">
-            ОК
-        </button>
-    </div>
-</div>
-
+    </script>
 </body>
 </html>
