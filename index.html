@@ -1,344 +1,541 @@
-<!DOCTYPE html>
-<html lang="uk">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Чат-бот на основі Gemini</title>
-    <!-- Tailwind CSS CDN для стилізації -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Шрифт Inter -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f3f4f6;
-        }
-        .chat-container {
-            max-width: 600px;
-            height: 80vh;
-            display: flex;
-            flex-direction: column;
-            border-radius: 1.5rem;
-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
-        }
-        .chat-box {
-            flex: 1;
-            overflow-y: auto;
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            padding: 1.5rem;
-            background-color: #ffffff;
-        }
-        .message-bubble {
-            max-width: 85%;
-            padding: 0.75rem 1.25rem;
-            border-radius: 1.5rem;
-            word-wrap: break-word;
-        }
-        .user-message {
-            background-color: #1a73e8;
-            color: #ffffff;
-            align-self: flex-end;
-            border-bottom-right-radius: 0.5rem;
-        }
-        .bot-message {
-            background-color: #e5e7eb;
-            color: #1f2937;
-            align-self: flex-start;
-            border-bottom-left-radius: 0.5rem;
-        }
-        .loading-dots {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-        }
-        .loading-dot {
-            width: 8px;
-            height: 8px;
-            background-color: #6b7280;
-            border-radius: 50%;
-            margin: 0 4px;
-            animation: bounce 0.6s infinite alternate;
-        }
-        .loading-dot:nth-child(2) {
-            animation-delay: 0.2s;
-        }
-        .loading-dot:nth-child(3) {
-            animation-delay: 0.4s;
-        }
-        @keyframes bounce {
-            from {
-                transform: translateY(0);
-            }
-            to {
-                transform: translateY(-8px);
-            }
-        }
-        .spinner {
-            border: 4px solid rgba(0, 0, 0, 0.1);
-            border-left-color: #1a73e8;
-            border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            animation: spin 1s linear infinite;
-        }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-    </style>
-</head>
-<body class="bg-gray-100 p-4 sm:p-8 flex items-center justify-center min-h-screen">
-
-    <!-- Головний контейнер чату -->
-    <div class="chat-container bg-white rounded-3xl overflow-hidden shadow-2xl w-full">
-
-        <!-- Заголовок та ID користувача -->
-        <div class="p-6 bg-blue-600 text-white text-center rounded-t-3xl">
-            <h1 class="text-3xl font-bold">Чат-бот Gemini</h1>
-            <p id="user-id-display" class="mt-2 text-sm text-blue-200">ID користувача: Завантаження...</p>
-        </div>
-
-        <!-- Контейнер для повідомлень -->
-        <div id="chat-box" class="chat-box">
-            <!-- Повідомлення будуть додаватися сюди динамічно -->
-        </div>
-
-        <!-- Індикатор завантаження -->
-        <div id="loading-indicator" class="hidden flex justify-center p-4">
-            <div class="spinner"></div>
-        </div>
-
-        <!-- Поле вводу та кнопка відправки -->
-        <div class="p-4 bg-gray-100 flex items-center gap-4 rounded-b-3xl">
-            <input type="text" id="message-input" placeholder="Введіть ваше повідомлення..."
-                   class="flex-1 p-3 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200" />
-            <button id="send-button" class="bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-all duration-200 active:scale-95">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
-                    <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.945a.75.75 0 00.926.94L16.5 12l-10.076 3.615a.75.75 0 00-.926.94l2.432 7.945a.75.75 0 00.926.94 24.387 24.387 0 006.89-2.083 24.387 24.387 0 006.89-2.083a.75.75 0 00.926-.94l-2.432-7.945a.75.75 0 00-.926-.94l-10.076-3.615z" />
-                </svg>
-            </button>
-        </div>
-    </div>
-
-    <!-- Модальне вікно для повідомлень про помилки -->
-    <div id="error-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4">
-        <div class="bg-white p-6 rounded-lg shadow-xl text-center">
-            <h2 class="text-xl font-bold text-red-600 mb-4">Помилка</h2>
-            <p id="error-message" class="text-gray-700 mb-6"></p>
-            <button id="close-modal" class="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition-colors">Закрити</button>
-        </div>
-    </div>
-
-    <!-- Firebase SDK -->
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, getDoc, setDoc, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-        // Важливо: ці змінні надаються середовищем Canvas.
-        // Не змінюйте їх.
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
-
-        // Встановлення рівня логування для відладки
-        setLogLevel('debug');
-
-        // Ініціалізація Firebase
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-
-        // Посилання на елементи DOM
-        const chatBox = document.getElementById('chat-box');
-        const messageInput = document.getElementById('message-input');
-        const sendButton = document.getElementById('send-button');
-        const loadingIndicator = document.getElementById('loading-indicator');
-        const userIdDisplay = document.getElementById('user-id-display');
-        const errorModal = document.getElementById('error-modal');
-        const errorMessage = document.getElementById('error-message');
-        const closeModalButton = document.getElementById('close-modal');
-
-        let isAuthReady = false;
-        let userId = '';
-        const privateUserCollectionPath = `/artifacts/${appId}/users`;
-        const publicCollectionPath = `/artifacts/${appId}/public/data`;
-
-        // Функція для показу модального вікна з помилкою
-        function showModal(message) {
-            errorMessage.textContent = message;
-            errorModal.classList.remove('hidden');
-        }
-
-        closeModalButton.addEventListener('click', () => {
-            errorModal.classList.add('hidden');
-        });
-
-        // Ініціалізація автентифікації користувача
-        onAuthStateChanged(auth, async (user) => {
-            if (user) {
-                userId = user.uid;
-                userIdDisplay.textContent = `Ваш ID: ${userId}`;
-            } else {
-                try {
-                    await signInAnonymously(auth);
-                    userId = auth.currentUser.uid;
-                    userIdDisplay.textContent = `Ваш ID: ${userId}`;
-                } catch (error) {
-                    console.error("Помилка анонімної автентифікації:", error);
-                    showModal('Не вдалося автентифікувати користувача. Будь ласка, спробуйте пізніше.');
-                }
-            }
-            isAuthReady = true;
-            if (isAuthReady && userId) {
-                setupChatListener();
-            }
-        });
-
-        if (initialAuthToken) {
-            signInWithCustomToken(auth, initialAuthToken).catch(error => {
-                console.error("Помилка автентифікації:", error);
-                showModal('Не вдалося автентифікувати користувача. Будь ласка, спробуйте пізніше.');
-            });
-        }
-
-        // Функція для відображення повідомлення в чаті
-        function displayMessage(text, sender) {
-            const messageWrapper = document.createElement('div');
-            messageWrapper.classList.add('flex', sender === 'user' ? 'justify-end' : 'justify-start');
-
-            const messageBubble = document.createElement('div');
-            messageBubble.classList.add('message-bubble', sender === 'user' ? 'user-message' : 'bot-message');
-            messageBubble.textContent = text;
-            
-            messageWrapper.appendChild(messageBubble);
-            chatBox.appendChild(messageWrapper);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        // Функція для отримання відповіді від API
-        async function getBotResponse(message) {
-            const userQuery = message;
-            const systemPrompt = "Ти — дружній та корисний чат-бот, створений для відповідей на запитання. Відповідай українською мовою. Намагайся бути лаконічним, але інформативним.";
-            const apiKey = ""; // Ключ API залишається пустим, він надається середовищем.
-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
-
-            const payload = {
-                contents: [{ parts: [{ text: userQuery }] }],
-                tools: [{ "google_search": {} }],
-                systemInstruction: {
-                    parts: [{ text: systemPrompt }]
-                }
-            };
-
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-
-                if (!response.ok) {
-                    const errorData = await response.json();
-                    console.error('Помилка API:', errorData);
-                    throw new Error(`Помилка API: ${response.status} ${response.statusText}`);
-                }
-
-                const result = await response.json();
-                const candidate = result.candidates?.[0];
-                if (candidate && candidate.content?.parts?.[0]?.text) {
-                    return candidate.content.parts[0].text;
-                } else {
-                    console.error("Відповідь API не містить тексту:", result);
-                    throw new Error("Відповідь API не містить тексту.");
-                }
-            } catch (error) {
-                console.error('Помилка при отриманні відповіді від бота:', error);
-                // Перевіряємо, чи це 401 помилка автентифікації
-                if (error.message.includes('401')) {
-                    showModal("Помилка автентифікації: Не вдалося з'єднатися з сервісом. Перевірте свій ключ API.");
-                } else {
-                    showModal("Помилка: Не вдалося отримати відповідь. Будь ласка, спробуйте ще раз.");
-                }
-                return 'На жаль, не можу зараз відповісти. Сталася помилка.';
-            }
-        }
-
-        // Функція для відправки повідомлення
-        async function sendMessage() {
-            const messageText = messageInput.value.trim();
-            if (!messageText || !userId) {
-                console.error("Повідомлення пусте або userId не доступний.");
-                return;
-            }
-
-            // Створюємо шлях до колекції для приватних повідомлень
-            const messagesCollection = collection(db, `${privateUserCollectionPath}/${userId}/messages`);
-
-            // Відображаємо повідомлення користувача одразу
-            displayMessage(messageText, 'user');
-            messageInput.value = '';
-            
-            // Зберігаємо повідомлення користувача у Firestore
-            await addDoc(messagesCollection, {
-                text: messageText,
-                sender: 'user',
-                timestamp: serverTimestamp()
-            });
-
-            // Показуємо індикатор завантаження
-            loadingIndicator.classList.remove('hidden');
-            chatBox.scrollTop = chatBox.scrollHeight;
-
-            const botResponse = await getBotResponse(messageText);
-            
-            // Ховаємо індикатор завантаження
-            loadingIndicator.classList.add('hidden');
-
-            // Відображаємо відповідь бота
-            displayMessage(botResponse, 'bot');
-            
-            // Зберігаємо відповідь бота у Firestore
-            await addDoc(messagesCollection, {
-                text: botResponse,
-                sender: 'bot',
-                timestamp: serverTimestamp()
-            });
-        }
-
-        // Слухачі подій
-        sendButton.addEventListener('click', sendMessage);
-        messageInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                sendMessage();
-            }
-        });
-        
-        // Слухач Firestore для оновлення чату в реальному часі
-        function setupChatListener() {
-            if (!userId) {
-                console.error("userId не доступний для налаштування слухача чату.");
-                return;
-            }
-            
-            const messagesCollection = collection(db, `${privateUserCollectionPath}/${userId}/messages`);
-            const messagesQuery = query(messagesCollection, orderBy('timestamp'));
-
-            onSnapshot(messagesQuery, (snapshot) => {
-                chatBox.innerHTML = ''; // Очищаємо чат перед відображенням
-                snapshot.forEach(doc => {
-                    const message = doc.data();
-                    displayMessage(message.text, message.sender);
-                });
-            }, (error) => {
-                console.error("Помилка при отриманні історії чату:", error);
-                // Оскільки правила безпеки тепер правильні, ця помилка не повинна виникати
-                showModal('Не вдалося завантажити історію чату. Будь ласка, перевірте з\'єднання.');
-            });
-        }
-    </script>
-</body>
-</html>
+     diff --git a/index.html b/index.html
+index 4ae6b9f1bb18ffc1093992efb449640feacc614e..053ac85cd19e4c2f68a8d463f82e496df614cc14 100644
+--- a/index.html
++++ b/index.html
+@@ -1,344 +1,216 @@
+ <!DOCTYPE html>
+ <html lang="uk">
+ <head>
+     <meta charset="UTF-8">
+     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+-    <title>Чат-бот на основі Gemini</title>
+-    <!-- Tailwind CSS CDN для стилізації -->
++    <title>Друзі Онлайн — соціальна мережа</title>
+     <script src="https://cdn.tailwindcss.com"></script>
+-    <!-- Шрифт Inter -->
+     <link rel="preconnect" href="https://fonts.googleapis.com">
+     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
++    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+     <style>
+-        body {
+-            font-family: 'Inter', sans-serif;
+-            background-color: #f3f4f6;
+-        }
+-        .chat-container {
+-            max-width: 600px;
+-            height: 80vh;
+-            display: flex;
+-            flex-direction: column;
+-            border-radius: 1.5rem;
+-            box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
+-        }
+-        .chat-box {
+-            flex: 1;
+-            overflow-y: auto;
+-            display: flex;
+-            flex-direction: column;
+-            gap: 1rem;
+-            padding: 1.5rem;
+-            background-color: #ffffff;
+-        }
+-        .message-bubble {
+-            max-width: 85%;
+-            padding: 0.75rem 1.25rem;
+-            border-radius: 1.5rem;
+-            word-wrap: break-word;
+-        }
+-        .user-message {
+-            background-color: #1a73e8;
+-            color: #ffffff;
+-            align-self: flex-end;
+-            border-bottom-right-radius: 0.5rem;
+-        }
+-        .bot-message {
+-            background-color: #e5e7eb;
+-            color: #1f2937;
+-            align-self: flex-start;
+-            border-bottom-left-radius: 0.5rem;
+-        }
+-        .loading-dots {
+-            display: flex;
+-            justify-content: center;
+-            align-items: center;
+-        }
+-        .loading-dot {
+-            width: 8px;
+-            height: 8px;
+-            background-color: #6b7280;
+-            border-radius: 50%;
+-            margin: 0 4px;
+-            animation: bounce 0.6s infinite alternate;
+-        }
+-        .loading-dot:nth-child(2) {
+-            animation-delay: 0.2s;
+-        }
+-        .loading-dot:nth-child(3) {
+-            animation-delay: 0.4s;
+-        }
+-        @keyframes bounce {
+-            from {
+-                transform: translateY(0);
+-            }
+-            to {
+-                transform: translateY(-8px);
+-            }
+-        }
+-        .spinner {
+-            border: 4px solid rgba(0, 0, 0, 0.1);
+-            border-left-color: #1a73e8;
+-            border-radius: 50%;
+-            width: 24px;
+-            height: 24px;
+-            animation: spin 1s linear infinite;
+-        }
+-        @keyframes spin {
+-            to { transform: rotate(360deg); }
+-        }
++        body { font-family: 'Inter', sans-serif; }
++        .glass { backdrop-filter: blur(18px); background: rgba(255, 255, 255, 0.86); }
++        .story-ring { background: linear-gradient(135deg, #2563eb, #facc15, #ec4899); }
+     </style>
+ </head>
+-<body class="bg-gray-100 p-4 sm:p-8 flex items-center justify-center min-h-screen">
+-
+-    <!-- Головний контейнер чату -->
+-    <div class="chat-container bg-white rounded-3xl overflow-hidden shadow-2xl w-full">
+-
+-        <!-- Заголовок та ID користувача -->
+-        <div class="p-6 bg-blue-600 text-white text-center rounded-t-3xl">
+-            <h1 class="text-3xl font-bold">Чат-бот Gemini</h1>
+-            <p id="user-id-display" class="mt-2 text-sm text-blue-200">ID користувача: Завантаження...</p>
+-        </div>
+-
+-        <!-- Контейнер для повідомлень -->
+-        <div id="chat-box" class="chat-box">
+-            <!-- Повідомлення будуть додаватися сюди динамічно -->
++<body class="min-h-screen bg-slate-100 text-slate-900">
++    <header class="sticky top-0 z-30 border-b border-white/70 glass">
++        <div class="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between lg:px-8">
++            <div class="flex items-center gap-3">
++                <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-600 text-2xl font-black text-white shadow-lg shadow-blue-200">Д</div>
++                <div>
++                    <h1 class="text-2xl font-extrabold tracking-tight">Друзі Онлайн</h1>
++                    <p class="text-sm text-slate-500">Українська демо-соціальна мережа</p>
++                </div>
++            </div>
++            <label class="relative block w-full sm:max-w-sm">
++                <span class="sr-only">Пошук</span>
++                <input id="search-input" class="w-full rounded-full border border-slate-200 bg-white px-5 py-3 pl-11 shadow-sm outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100" placeholder="Пошук дописів або людей...">
++                <span class="absolute left-4 top-3.5 text-slate-400">⌕</span>
++            </label>
+         </div>
+-
+-        <!-- Індикатор завантаження -->
+-        <div id="loading-indicator" class="hidden flex justify-center p-4">
+-            <div class="spinner"></div>
+-        </div>
+-
+-        <!-- Поле вводу та кнопка відправки -->
+-        <div class="p-4 bg-gray-100 flex items-center gap-4 rounded-b-3xl">
+-            <input type="text" id="message-input" placeholder="Введіть ваше повідомлення..."
+-                   class="flex-1 p-3 rounded-full border border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all duration-200" />
+-            <button id="send-button" class="bg-blue-600 text-white p-3 rounded-full shadow-lg hover:bg-blue-700 transition-all duration-200 active:scale-95">
+-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+-                    <path d="M3.478 2.405a.75.75 0 00-.926.94l2.432 7.945a.75.75 0 00.926.94L16.5 12l-10.076 3.615a.75.75 0 00-.926.94l2.432 7.945a.75.75 0 00.926.94 24.387 24.387 0 006.89-2.083 24.387 24.387 0 006.89-2.083a.75.75 0 00.926-.94l-2.432-7.945a.75.75 0 00-.926-.94l-10.076-3.615z" />
+-                </svg>
+-            </button>
+-        </div>
+-    </div>
+-
+-    <!-- Модальне вікно для повідомлень про помилки -->
+-    <div id="error-modal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-75 flex items-center justify-center p-4">
+-        <div class="bg-white p-6 rounded-lg shadow-xl text-center">
+-            <h2 class="text-xl font-bold text-red-600 mb-4">Помилка</h2>
+-            <p id="error-message" class="text-gray-700 mb-6"></p>
+-            <button id="close-modal" class="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition-colors">Закрити</button>
+-        </div>
+-    </div>
+-
+-    <!-- Firebase SDK -->
+-    <script type="module">
+-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+-        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, doc, getDoc, setDoc, serverTimestamp, setLogLevel } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+-
+-        // Важливо: ці змінні надаються середовищем Canvas.
+-        // Не змінюйте їх.
+-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+-        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+-
+-        // Встановлення рівня логування для відладки
+-        setLogLevel('debug');
+-
+-        // Ініціалізація Firebase
+-        const app = initializeApp(firebaseConfig);
+-        const db = getFirestore(app);
+-        const auth = getAuth(app);
+-
+-        // Посилання на елементи DOM
+-        const chatBox = document.getElementById('chat-box');
+-        const messageInput = document.getElementById('message-input');
+-        const sendButton = document.getElementById('send-button');
+-        const loadingIndicator = document.getElementById('loading-indicator');
+-        const userIdDisplay = document.getElementById('user-id-display');
+-        const errorModal = document.getElementById('error-modal');
+-        const errorMessage = document.getElementById('error-message');
+-        const closeModalButton = document.getElementById('close-modal');
+-
+-        let isAuthReady = false;
+-        let userId = '';
+-        const privateUserCollectionPath = `/artifacts/${appId}/users`;
+-        const publicCollectionPath = `/artifacts/${appId}/public/data`;
+-
+-        // Функція для показу модального вікна з помилкою
+-        function showModal(message) {
+-            errorMessage.textContent = message;
+-            errorModal.classList.remove('hidden');
+-        }
+-
+-        closeModalButton.addEventListener('click', () => {
+-            errorModal.classList.add('hidden');
+-        });
+-
+-        // Ініціалізація автентифікації користувача
+-        onAuthStateChanged(auth, async (user) => {
+-            if (user) {
+-                userId = user.uid;
+-                userIdDisplay.textContent = `Ваш ID: ${userId}`;
+-            } else {
+-                try {
+-                    await signInAnonymously(auth);
+-                    userId = auth.currentUser.uid;
+-                    userIdDisplay.textContent = `Ваш ID: ${userId}`;
+-                } catch (error) {
+-                    console.error("Помилка анонімної автентифікації:", error);
+-                    showModal('Не вдалося автентифікувати користувача. Будь ласка, спробуйте пізніше.');
+-                }
+-            }
+-            isAuthReady = true;
+-            if (isAuthReady && userId) {
+-                setupChatListener();
+-            }
+-        });
+-
+-        if (initialAuthToken) {
+-            signInWithCustomToken(auth, initialAuthToken).catch(error => {
+-                console.error("Помилка автентифікації:", error);
+-                showModal('Не вдалося автентифікувати користувача. Будь ласка, спробуйте пізніше.');
++    </header>
++
++    <main class="mx-auto grid max-w-7xl gap-6 px-4 py-6 lg:grid-cols-[280px_minmax(0,1fr)_320px] lg:px-8">
++        <aside class="space-y-4">
++            <section class="rounded-3xl bg-white p-5 shadow-sm">
++                <div class="flex items-center gap-4">
++                    <img id="profile-avatar" class="h-16 w-16 rounded-2xl object-cover" alt="Аватар профілю" src="https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=160&q=80">
++                    <div>
++                        <h2 id="profile-name" class="text-lg font-bold">Олена Коваль</h2>
++                        <p class="text-sm text-slate-500">@olena.social</p>
++                    </div>
++                </div>
++                <div class="mt-5 grid grid-cols-3 rounded-2xl bg-slate-50 p-3 text-center">
++                    <div><strong id="post-count" class="block text-blue-600">0</strong><span class="text-xs text-slate-500">дописів</span></div>
++                    <div><strong class="block text-blue-600">128</strong><span class="text-xs text-slate-500">друзів</span></div>
++                    <div><strong id="like-count" class="block text-blue-600">0</strong><span class="text-xs text-slate-500">лайків</span></div>
++                </div>
++            </section>
++
++            <nav class="rounded-3xl bg-white p-3 shadow-sm" aria-label="Головна навігація">
++                <a class="flex items-center gap-3 rounded-2xl bg-blue-50 px-4 py-3 font-semibold text-blue-700" href="#feed">🏠 Стрічка</a>
++                <a class="flex items-center gap-3 rounded-2xl px-4 py-3 font-semibold text-slate-600 hover:bg-slate-50" href="#friends">👥 Друзі</a>
++                <a class="flex items-center gap-3 rounded-2xl px-4 py-3 font-semibold text-slate-600 hover:bg-slate-50" href="#events">📅 Події</a>
++                <a class="flex items-center gap-3 rounded-2xl px-4 py-3 font-semibold text-slate-600 hover:bg-slate-50" href="#messages">💬 Повідомлення</a>
++            </nav>
++        </aside>
++
++        <section id="feed" class="space-y-5">
++            <div class="rounded-3xl bg-white p-5 shadow-sm">
++                <div class="flex gap-4 overflow-x-auto pb-2" id="stories"></div>
++            </div>
++
++            <form id="post-form" class="rounded-3xl bg-white p-5 shadow-sm">
++                <label for="post-text" class="mb-3 block text-sm font-bold uppercase tracking-wide text-slate-500">Що у вас нового?</label>
++                <textarea id="post-text" class="min-h-28 w-full resize-none rounded-2xl border border-slate-200 p-4 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100" maxlength="280" placeholder="Поділіться новиною, фотоідеєю або планом на день..."></textarea>
++                <div class="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
++                    <p id="char-counter" class="text-sm text-slate-500">0 / 280 символів</p>
++                    <button class="rounded-full bg-blue-600 px-6 py-3 font-bold text-white shadow-lg shadow-blue-200 transition hover:bg-blue-700 active:scale-95" type="submit">Опублікувати</button>
++                </div>
++            </form>
++
++            <div id="posts" class="space-y-5" aria-live="polite"></div>
++        </section>
++
++        <aside class="space-y-5">
++            <section id="friends" class="rounded-3xl bg-white p-5 shadow-sm">
++                <h2 class="text-lg font-extrabold">Рекомендовані друзі</h2>
++                <div id="friend-list" class="mt-4 space-y-4"></div>
++            </section>
++            <section id="events" class="rounded-3xl bg-gradient-to-br from-blue-600 to-indigo-700 p-5 text-white shadow-sm">
++                <p class="text-sm font-semibold uppercase text-blue-100">Подія тижня</p>
++                <h2 class="mt-2 text-2xl font-extrabold">Онлайн-зустріч спільноти</h2>
++                <p class="mt-2 text-blue-100">П'ятниця, 19:00. Обговорюємо ідеї для локальних проєктів та знайомимось.</p>
++                <button class="mt-5 rounded-full bg-white px-5 py-2.5 font-bold text-blue-700">Приєднатись</button>
++            </section>
++        </aside>
++    </main>
++
++    <template id="post-template">
++        <article class="rounded-3xl bg-white p-5 shadow-sm transition hover:shadow-md">
++            <div class="flex items-center justify-between gap-4">
++                <div class="flex items-center gap-3">
++                    <img class="post-avatar h-12 w-12 rounded-2xl object-cover" alt="Аватар автора">
++                    <div>
++                        <h3 class="post-author font-bold"></h3>
++                        <p class="post-time text-sm text-slate-500"></p>
++                    </div>
++                </div>
++                <span class="rounded-full bg-slate-100 px-3 py-1 text-sm text-slate-500">публічно</span>
++            </div>
++            <p class="post-content mt-4 whitespace-pre-wrap text-lg leading-relaxed text-slate-700"></p>
++            <div class="mt-5 flex flex-wrap items-center gap-3 border-t border-slate-100 pt-4">
++                <button class="like-button rounded-full bg-slate-100 px-4 py-2 font-semibold text-slate-600 transition hover:bg-blue-50 hover:text-blue-700" type="button">♡ Подобається</button>
++                <button class="comment-button rounded-full bg-slate-100 px-4 py-2 font-semibold text-slate-600 transition hover:bg-blue-50 hover:text-blue-700" type="button">💬 Коментар</button>
++                <span class="like-label text-sm text-slate-500"></span>
++            </div>
++            <form class="comment-form mt-4 hidden gap-2">
++                <input class="comment-input flex-1 rounded-full border border-slate-200 px-4 py-2 outline-none focus:border-blue-500" placeholder="Напишіть коментар...">
++                <button class="rounded-full bg-slate-900 px-4 py-2 font-semibold text-white" type="submit">Надіслати</button>
++            </form>
++            <div class="comments mt-4 space-y-2"></div>
++        </article>
++    </template>
++
++    <script>
++        const storageKey = 'friends-online-posts';
++        const currentUser = {
++            name: 'Олена Коваль',
++            avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=160&q=80'
++        };
++        const seedPosts = [
++            { id: crypto.randomUUID(), author: 'Андрій Мельник', avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?auto=format&fit=crop&w=160&q=80', text: 'Запускаємо нову волонтерську ініціативу у громаді. Хто готовий допомогти з дизайном афіші?', createdAt: Date.now() - 3600000, likes: 12, liked: false, comments: ['Можу допомогти після роботи!'] },
++            { id: crypto.randomUUID(), author: 'Марія Савчук', avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=160&q=80', text: 'Сьогодні чудовий день для прогулянки та кави. Діліться своїми фото у стрічці ☀️', createdAt: Date.now() - 7200000, likes: 8, liked: false, comments: [] }
++        ];
++        const storiesData = [currentUser, { name: 'Андрій', avatar: seedPosts[0].avatar }, { name: 'Марія', avatar: seedPosts[1].avatar }, { name: 'Ігор', avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?auto=format&fit=crop&w=160&q=80' }];
++        const friends = [
++            ['Ігор Петренко', 'Фотограф', storiesData[3].avatar],
++            ['Наталя Бойко', 'UX-дизайнерка', 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&w=160&q=80'],
++            ['Сергій Лис', 'Розробник', 'https://images.unsplash.com/photo-1519345182560-3f2917c472ef?auto=format&fit=crop&w=160&q=80']
++        ];
++
++        const postForm = document.querySelector('#post-form');
++        const postText = document.querySelector('#post-text');
++        const postsContainer = document.querySelector('#posts');
++        const postTemplate = document.querySelector('#post-template');
++        const charCounter = document.querySelector('#char-counter');
++        const searchInput = document.querySelector('#search-input');
++
++        let posts = JSON.parse(localStorage.getItem(storageKey) || 'null') || seedPosts;
++
++        function savePosts() { localStorage.setItem(storageKey, JSON.stringify(posts)); }
++        function formatTime(timestamp) { return new Intl.DateTimeFormat('uk-UA', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' }).format(timestamp); }
++        function updateStats() {
++            document.querySelector('#post-count').textContent = posts.length;
++            document.querySelector('#like-count').textContent = posts.reduce((sum, post) => sum + post.likes, 0);
++        }
++
++        function renderStories() {
++            document.querySelector('#stories').innerHTML = storiesData.map(story => `
++                <button class="min-w-20 text-center" type="button">
++                    <span class="story-ring mx-auto block h-16 w-16 rounded-2xl p-1"><img class="h-full w-full rounded-xl object-cover ring-4 ring-white" src="${story.avatar}" alt="${story.name}"></span>
++                    <span class="mt-2 block truncate text-sm font-semibold">${story.name}</span>
++                </button>`).join('');
++        }
++
++        function renderFriends() {
++            document.querySelector('#friend-list').innerHTML = friends.map(([name, role, avatar]) => `
++                <div class="flex items-center justify-between gap-3">
++                    <div class="flex items-center gap-3"><img class="h-11 w-11 rounded-2xl object-cover" src="${avatar}" alt="${name}"><div><p class="font-bold">${name}</p><p class="text-sm text-slate-500">${role}</p></div></div>
++                    <button class="rounded-full bg-blue-50 px-3 py-1.5 text-sm font-bold text-blue-700">Додати</button>
++                </div>`).join('');
++        }
++
++        function renderPosts() {
++            const query = searchInput.value.trim().toLowerCase();
++            postsContainer.innerHTML = '';
++            posts.filter(post => `${post.author} ${post.text}`.toLowerCase().includes(query)).forEach(post => {
++                const node = postTemplate.content.cloneNode(true);
++                node.querySelector('.post-avatar').src = post.avatar;
++                node.querySelector('.post-author').textContent = post.author;
++                node.querySelector('.post-time').textContent = formatTime(post.createdAt);
++                node.querySelector('.post-content').textContent = post.text;
++                node.querySelector('.like-button').textContent = `${post.liked ? '♥' : '♡'} Подобається`;
++                node.querySelector('.like-button').classList.toggle('text-blue-700', post.liked);
++                node.querySelector('.like-label').textContent = `${post.likes} вподобань`;
++                node.querySelector('.comments').innerHTML = post.comments.map(comment => `<p class="rounded-2xl bg-slate-50 px-4 py-2 text-sm text-slate-600"><strong>${currentUser.name}:</strong> ${comment}</p>`).join('');
++                node.querySelector('.like-button').addEventListener('click', () => toggleLike(post.id));
++                node.querySelector('.comment-button').addEventListener('click', event => event.currentTarget.closest('article').querySelector('.comment-form').classList.toggle('hidden'));
++                node.querySelector('.comment-form').addEventListener('submit', event => addComment(event, post.id));
++                postsContainer.appendChild(node);
+             });
++            updateStats();
+         }
+ 
+-        // Функція для відображення повідомлення в чаті
+-        function displayMessage(text, sender) {
+-            const messageWrapper = document.createElement('div');
+-            messageWrapper.classList.add('flex', sender === 'user' ? 'justify-end' : 'justify-start');
+-
+-            const messageBubble = document.createElement('div');
+-            messageBubble.classList.add('message-bubble', sender === 'user' ? 'user-message' : 'bot-message');
+-            messageBubble.textContent = text;
+-            
+-            messageWrapper.appendChild(messageBubble);
+-            chatBox.appendChild(messageWrapper);
+-            chatBox.scrollTop = chatBox.scrollHeight;
+-        }
+-
+-        // Функція для отримання відповіді від API
+-        async function getBotResponse(message) {
+-            const userQuery = message;
+-            const systemPrompt = "Ти — дружній та корисний чат-бот, створений для відповідей на запитання. Відповідай українською мовою. Намагайся бути лаконічним, але інформативним.";
+-            const apiKey = ""; // Ключ API залишається пустим, він надається середовищем.
+-            const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-05-20:generateContent?key=${apiKey}`;
+-
+-            const payload = {
+-                contents: [{ parts: [{ text: userQuery }] }],
+-                tools: [{ "google_search": {} }],
+-                systemInstruction: {
+-                    parts: [{ text: systemPrompt }]
+-                }
+-            };
+-
+-            try {
+-                const response = await fetch(apiUrl, {
+-                    method: 'POST',
+-                    headers: { 'Content-Type': 'application/json' },
+-                    body: JSON.stringify(payload)
+-                });
+-
+-                if (!response.ok) {
+-                    const errorData = await response.json();
+-                    console.error('Помилка API:', errorData);
+-                    throw new Error(`Помилка API: ${response.status} ${response.statusText}`);
+-                }
+-
+-                const result = await response.json();
+-                const candidate = result.candidates?.[0];
+-                if (candidate && candidate.content?.parts?.[0]?.text) {
+-                    return candidate.content.parts[0].text;
+-                } else {
+-                    console.error("Відповідь API не містить тексту:", result);
+-                    throw new Error("Відповідь API не містить тексту.");
+-                }
+-            } catch (error) {
+-                console.error('Помилка при отриманні відповіді від бота:', error);
+-                // Перевіряємо, чи це 401 помилка автентифікації
+-                if (error.message.includes('401')) {
+-                    showModal("Помилка автентифікації: Не вдалося з'єднатися з сервісом. Перевірте свій ключ API.");
+-                } else {
+-                    showModal("Помилка: Не вдалося отримати відповідь. Будь ласка, спробуйте ще раз.");
+-                }
+-                return 'На жаль, не можу зараз відповісти. Сталася помилка.';
+-            }
++        function toggleLike(id) {
++            posts = posts.map(post => post.id === id ? { ...post, liked: !post.liked, likes: post.likes + (post.liked ? -1 : 1) } : post);
++            savePosts(); renderPosts();
+         }
+ 
+-        // Функція для відправки повідомлення
+-        async function sendMessage() {
+-            const messageText = messageInput.value.trim();
+-            if (!messageText || !userId) {
+-                console.error("Повідомлення пусте або userId не доступний.");
+-                return;
+-            }
+-
+-            // Створюємо шлях до колекції для приватних повідомлень
+-            const messagesCollection = collection(db, `${privateUserCollectionPath}/${userId}/messages`);
+-
+-            // Відображаємо повідомлення користувача одразу
+-            displayMessage(messageText, 'user');
+-            messageInput.value = '';
+-            
+-            // Зберігаємо повідомлення користувача у Firestore
+-            await addDoc(messagesCollection, {
+-                text: messageText,
+-                sender: 'user',
+-                timestamp: serverTimestamp()
+-            });
+-
+-            // Показуємо індикатор завантаження
+-            loadingIndicator.classList.remove('hidden');
+-            chatBox.scrollTop = chatBox.scrollHeight;
+-
+-            const botResponse = await getBotResponse(messageText);
+-            
+-            // Ховаємо індикатор завантаження
+-            loadingIndicator.classList.add('hidden');
+-
+-            // Відображаємо відповідь бота
+-            displayMessage(botResponse, 'bot');
+-            
+-            // Зберігаємо відповідь бота у Firestore
+-            await addDoc(messagesCollection, {
+-                text: botResponse,
+-                sender: 'bot',
+-                timestamp: serverTimestamp()
+-            });
++        function addComment(event, id) {
++            event.preventDefault();
++            const input = event.currentTarget.querySelector('.comment-input');
++            const value = input.value.trim();
++            if (!value) return;
++            posts = posts.map(post => post.id === id ? { ...post, comments: [...post.comments, value] } : post);
++            savePosts(); renderPosts();
+         }
+ 
+-        // Слухачі подій
+-        sendButton.addEventListener('click', sendMessage);
+-        messageInput.addEventListener('keydown', (e) => {
+-            if (e.key === 'Enter') {
+-                sendMessage();
+-            }
++        postText.addEventListener('input', () => { charCounter.textContent = `${postText.value.length} / 280 символів`; });
++        searchInput.addEventListener('input', renderPosts);
++        postForm.addEventListener('submit', event => {
++            event.preventDefault();
++            const text = postText.value.trim();
++            if (!text) return;
++            posts = [{ id: crypto.randomUUID(), author: currentUser.name, avatar: currentUser.avatar, text, createdAt: Date.now(), likes: 0, liked: false, comments: [] }, ...posts];
++            postText.value = '';
++            charCounter.textContent = '0 / 280 символів';
++            savePosts(); renderPosts();
+         });
+-        
+-        // Слухач Firestore для оновлення чату в реальному часі
+-        function setupChatListener() {
+-            if (!userId) {
+-                console.error("userId не доступний для налаштування слухача чату.");
+-                return;
+-            }
+-            
+-            const messagesCollection = collection(db, `${privateUserCollectionPath}/${userId}/messages`);
+-            const messagesQuery = query(messagesCollection, orderBy('timestamp'));
+ 
+-            onSnapshot(messagesQuery, (snapshot) => {
+-                chatBox.innerHTML = ''; // Очищаємо чат перед відображенням
+-                snapshot.forEach(doc => {
+-                    const message = doc.data();
+-                    displayMessage(message.text, message.sender);
+-                });
+-            }, (error) => {
+-                console.error("Помилка при отриманні історії чату:", error);
+-                // Оскільки правила безпеки тепер правильні, ця помилка не повинна виникати
+-                showModal('Не вдалося завантажити історію чату. Будь ласка, перевірте з\'єднання.');
+-            });
+-        }
++        renderStories(); renderFriends(); renderPosts();
+     </script>
+ </body>
+ </html>
