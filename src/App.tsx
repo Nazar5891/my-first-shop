@@ -12,7 +12,7 @@ import { MoreTab } from './components/MoreTab';
 import { BottomNav } from './components/BottomNav';
 import { DistanceRangeSlider } from './components/DistanceRangeSlider';
 import { INITIAL_LISTINGS, COMMUNITY_CENTER } from './data/mockListings';
-import { Listing, CategoryId, ActiveTab } from './types';
+import { Listing, ListingComment, CategoryId, ActiveTab } from './types';
 import { sortListings, calculateDistanceMeters } from './utils/distance';
 import { db, auth } from './firebase';
 import { addDoc, collection, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
@@ -20,7 +20,8 @@ import { onAuthStateChanged, type User } from 'firebase/auth';
 import { Siren, SlidersHorizontal, Plus } from 'lucide-react';
 
 export default function App() {
-  const [listings, setListings] = useState<Listing[]>(INITIAL_LISTINGS);
+  const [remoteListings, setRemoteListings] = useState<Listing[]>([]);
+  const [commentsByListing, setCommentsByListing] = useState<Record<string, ListingComment[]>>({});
   const [user, setUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<ActiveTab>('map');
   const [searchQuery, setSearchQuery] = useState('');
@@ -37,8 +38,63 @@ export default function App() {
   const [routingListing, setRoutingListing] = useState<Listing | null>(null);
   const [reportingListing, setReportingListing] = useState<Listing | null>(null);
 
+  const listings = useMemo(() => [
+    ...INITIAL_LISTINGS,
+    ...remoteListings.map(item => ({
+      ...item,
+      comments: commentsByListing[item.id] ?? item.comments ?? [],
+    })),
+  ], [remoteListings, commentsByListing]);
+
   useEffect(() => onAuthStateChanged(auth, setUser), []);
-  useEffect(() => { const unsubscribe = onSnapshot(collection(db, 'listings'), (snapshot) => { const remoteListings = snapshot.docs.map((item) => ({ ...(item.data() as Omit<Listing, 'id'>), id: item.id })) as Listing[]; setListings([...INITIAL_LISTINGS, ...remoteListings]); }, (error) => { console.error('Не вдалося завантажити оголошення з Firestore:', error); setListings(INITIAL_LISTINGS); }); return unsubscribe; }, []);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, 'listings'),
+      (snapshot) => {
+        const remote = snapshot.docs.map((item) => ({
+          ...(item.data() as Omit<Listing, 'id'>),
+          id: item.id,
+        })) as Listing[];
+        setRemoteListings(remote);
+      },
+      (error) => {
+        console.error('Не вдалося завантажити оголошення з Firestore:', error);
+        setRemoteListings([]);
+      }
+    );
+    return unsubscribe;
+  }, []);
+
+  // Відгуки зберігаються окремо у Firestore, тому їх бачать усі акаунти.
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, 'comments'),
+      (snapshot) => {
+        const grouped: Record<string, ListingComment[]> = {};
+        snapshot.docs.forEach((item) => {
+          const data = item.data() as Omit<ListingComment, 'id'> & { listingId?: string };
+          if (!data.listingId) return;
+          const comment: ListingComment = {
+            id: item.id,
+            authorName: data.authorName || 'Мешканець громади',
+            text: data.text || '',
+            createdAt: data.createdAt || '',
+            rating: data.rating,
+            verifiedUser: data.verifiedUser,
+          };
+          if (!grouped[data.listingId]) grouped[data.listingId] = [];
+          grouped[data.listingId].push(comment);
+        });
+        Object.values(grouped).forEach(list => {
+          list.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+        });
+        setCommentsByListing(grouped);
+      },
+      (error) => console.error('Не вдалося завантажити відгуки з Firestore:', error)
+    );
+    return unsubscribe;
+  }, []);
 
   const processedListings = useMemo(() => listings.map((item) => ({ ...item, distanceMeters: calculateDistanceMeters(userCoords[0], userCoords[1], item.coordinates[0], item.coordinates[1]) })), [listings, userCoords]);
   const myListings = useMemo(() => user ? processedListings.filter(item => item.authorId === user.uid) : [], [processedListings, user]);
@@ -53,10 +109,29 @@ export default function App() {
     if (newListingData.urgencyLevel) listingData.urgencyLevel = newListingData.urgencyLevel;
     if (newListingData.urgentType) listingData.urgentType = newListingData.urgentType;
     if (newListingData.photoUrl) listingData.photoUrl = newListingData.photoUrl;
-    try { const created = await addDoc(collection(db, 'listings'), listingData); const dist = calculateDistanceMeters(userCoords[0], userCoords[1], newListingData.coordinates[0], newListingData.coordinates[1]); const createdListing = { ...(listingData as Omit<Listing,'id'>), id:created.id, distanceMeters:dist } as Listing; setListings(prev => [...prev, createdListing]); setSelectedListing(createdListing); setDetailListing(createdListing); setIsCreateModalOpen(false); return true; } catch (error) { console.error('Не вдалося опублікувати оголошення:', error); return false; }
+    try { const created = await addDoc(collection(db, 'listings'), listingData); const dist = calculateDistanceMeters(userCoords[0], userCoords[1], newListingData.coordinates[0], newListingData.coordinates[1]); const createdListing = { ...(listingData as Omit<Listing,'id'>), id:created.id, distanceMeters:dist } as Listing; setSelectedListing(createdListing); setDetailListing(createdListing); setIsCreateModalOpen(false); return true; } catch (error) { console.error('Не вдалося опублікувати оголошення:', error); return false; }
   };
 
-  const handleAddComment = (listingId: string, commentData: Omit<import('./types').ListingComment, 'id' | 'createdAt'>) => { const newComment: import('./types').ListingComment = { ...commentData, id:`comm-${Date.now()}`, createdAt:'Тільки-но' }; setListings((prev) => prev.map((item) => { if (item.id !== listingId) return item; const updatedListing={...item,comments:[newComment,...(item.comments||[])]}; if(detailListing?.id===listingId)setDetailListing(updatedListing); if(selectedListing?.id===listingId)setSelectedListing(updatedListing); return updatedListing; })); };
+  const handleAddComment = async (listingId: string, commentData: Omit<ListingComment, 'id' | 'createdAt'>) => {
+    if (!user) {
+      console.error('Для додавання відгуку потрібно увійти в акаунт.');
+      return;
+    }
+    try {
+      await addDoc(collection(db, 'comments'), {
+        listingId,
+        authorId: user.uid,
+        authorName: commentData.authorName || user.displayName || user.email?.split('@')[0] || 'Мешканець громади',
+        text: commentData.text,
+        rating: commentData.rating ?? 5,
+        verifiedUser: true,
+        createdAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      console.error('Не вдалося зберегти відгук у Firestore:', error);
+    }
+  };
+
   const handleDeleteListing = async (id:string):Promise<boolean> => { if(!user)return false; const target=listings.find(item=>item.id===id); if(!target||target.authorId!==user.uid)return false; try{await deleteDoc(doc(db,'listings',id)); if(selectedListing?.id===id)setSelectedListing(null); if(detailListing?.id===id)setDetailListing(null); if(activeNavigationListing?.id===id)setActiveNavigationListing(null); return true;}catch(error){console.error('Не вдалося видалити оголошення:',error);return false;} };
 
   const handleSelectListing = (listing: Listing | null) => {
@@ -65,7 +140,6 @@ export default function App() {
   };
 
   const handleStartOnlineNavigation = (listing: Listing) => {
-    // Close every overlay before drawing the route so the map and route stay visible.
     setDetailListing(null);
     setRoutingListing(null);
     setSelectedListing(listing);
