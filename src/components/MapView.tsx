@@ -16,7 +16,32 @@ export const MapView: React.FC<MapViewProps> = ({ listings, selectedListing, onS
   const isPinSelectModeRef=useRef(isPinSelectMode),onPinSelectedRef=useRef(onPinSelected),onSelectListingRef=useRef(onSelectListing);
   useEffect(()=>{isPinSelectModeRef.current=isPinSelectMode;onPinSelectedRef.current=onPinSelected;onSelectListingRef.current=onSelectListing;},[isPinSelectMode,onPinSelected,onSelectListing]);
   const TILE_URLS:Record<MapTileStyle,{url:string;attr:string}>={light:{url:'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',attr:'&copy; OpenStreetMap &copy; CARTO'},streets:{url:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',attr:'&copy; OpenStreetMap &copy; CARTO'},satellite:{url:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',attr:'&copy; Esri, Maxar, Earthstar Geographics'},dark:{url:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',attr:'&copy; OpenStreetMap &copy; CARTO'}};
-  useEffect(()=>{if(!mapContainerRef.current||mapInstanceRef.current)return;const initialCenter=userCoordinates&&Array.isArray(userCoordinates)&&userCoordinates.length===2?userCoordinates:COMMUNITY_CENTER;const map=L.map(mapContainerRef.current,{center:initialCenter,zoom:14,zoomControl:false});const c=TILE_URLS[mapStyle];tileLayerRef.current=L.tileLayer(c.url,{maxZoom:19,attribution:c.attr}).addTo(map);L.control.zoom({position:'bottomright'}).addTo(map);markersGroupRef.current=L.layerGroup().addTo(map);routeGroupRef.current=L.layerGroup().addTo(map);mapInstanceRef.current=map;map.on('click',(e:L.LeafletMouseEvent)=>{if(!e?.latlng){onSelectListingRef.current?.(null);return;}if(isPinSelectModeRef.current&&onPinSelectedRef.current)onPinSelectedRef.current([e.latlng.lat,e.latlng.lng]);else onSelectListingRef.current?.(null);});return()=>{map.remove();mapInstanceRef.current=null;};},[]);
+  useEffect(()=>{if(!mapContainerRef.current||mapInstanceRef.current)return;const initialCenter=userCoordinates&&Array.isArray(userCoordinates)&&userCoordinates.length===2?userCoordinates:COMMUNITY_CENTER;const map=L.map(mapContainerRef.current,{center:initialCenter,zoom:14,zoomControl:false});const c=TILE_URLS[mapStyle];tileLayerRef.current=L.tileLayer(c.url,{maxZoom:19,attribution:c.attr}).addTo(map);L.control.zoom({position:'bottomright'}).addTo(map);markersGroupRef.current=L.layerGroup().addTo(map);routeGroupRef.current=L.layerGroup().addTo(map);mapInstanceRef.current=map;map.on('click',(e:L.LeafletMouseEvent)=>{if(!e?.latlng){onSelectListingRef.current?.(null);return;}if(isPinSelectModeRef.current&&onPinSelectedRef.current)onPinSelectedRef.current([e.latlng.lat,e.latlng.lng]);else onSelectListingRef.current?.(null);});return()=>{map.remove();mapInstanceRef.current=null;};},[]);useEffect(() => {
+  if (!setUserCoordinates || !navigator.geolocation) return;
+
+  setIsLocating(true);
+
+  navigator.geolocation.getCurrentPosition(
+    (position) => {
+      const coords: [number, number] = [
+        position.coords.latitude,
+        position.coords.longitude
+      ];
+
+      setUserCoordinates(coords);
+      mapInstanceRef.current?.flyTo(coords, 15, { animate: true });
+      setIsLocating(false);
+    },
+    () => {
+      setIsLocating(false);
+    },
+    {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 0
+    }
+  );
+}, [setUserCoordinates]);
   useEffect(()=>{if(!mapInstanceRef.current||!tileLayerRef.current)return;tileLayerRef.current.remove();const c=TILE_URLS[mapStyle];tileLayerRef.current=L.tileLayer(c.url,{maxZoom:19,attribution:c.attr}).addTo(mapInstanceRef.current);},[mapStyle]);
   useEffect(()=>{const map=mapInstanceRef.current;if(!map)return;if(isPinSelectMode&&selectedPinLocation){if(pinSelectionMarkerRef.current)pinSelectionMarkerRef.current.setLatLng(selectedPinLocation);else{const icon=L.divIcon({className:'custom-pin-select-marker',html:'<div class="relative -translate-x-1/2 -translate-y-full flex flex-col items-center"><div class="bg-purple-600 text-white font-extrabold text-xs px-2.5 py-1 rounded-full shadow-lg border-2 border-purple-400 flex items-center gap-1 animate-bounce">📍 Обрана точка</div><div class="w-3 h-3 bg-purple-600 rotate-45 -mt-1.5 border-r border-b border-purple-400"></div></div>',iconSize:[0,0],iconAnchor:[0,0]});pinSelectionMarkerRef.current=L.marker(selectedPinLocation,{icon,interactive:false}).addTo(map);}}else if(pinSelectionMarkerRef.current){pinSelectionMarkerRef.current.remove();pinSelectionMarkerRef.current=null;}},[isPinSelectMode,selectedPinLocation]);
   useEffect(()=>{const map=mapInstanceRef.current,layerGroup=markersGroupRef.current;if(!map||!layerGroup)return;layerGroup.clearLayers();
