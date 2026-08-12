@@ -2,11 +2,8 @@
 @import "tailwindcss";
 
 @layer utilities {
-  .font-sans {
-    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Oxygen-Sans, sans-serif;
-  }
+  .font-sans { font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Oxygen-Sans, sans-serif; }
 }
-
 :root { color-scheme: dark; --app-nav-height: 82px; --app-safe-bottom: env(safe-area-inset-bottom, 0px); }
 * { box-sizing: border-box; }
 html, body, #root { width:100%; min-height:100%; margin:0; }
@@ -15,7 +12,7 @@ body { min-height:100dvh; overflow-x:hidden; overscroll-behavior-y:none; backgro
 button,input,textarea,select { font:inherit; }
 button { -webkit-tap-highlight-color:transparent; }
 header { position:relative; z-index:30; }
-.relative.z-10 > main { min-height:0; padding-bottom:calc(var(--app-nav-height) + var(--app-safe-bottom); }
+.relative.z-10 > main { min-height:0; padding-bottom:calc(var(--app-nav-height) + var(--app-safe-bottom)); }
 .fixed.inset-0 { z-index:100 !important; }
 .fixed.inset-0 > * { max-height:calc(100dvh - 24px); }
 .fixed.inset-0 .overflow-y-auto { overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
@@ -27,7 +24,7 @@ header { position:relative; z-index:30; }
 .cosmic-glow-purple { box-shadow:0 0 20px rgba(139,92,246,.35); }
 .cosmic-glow-red { box-shadow:0 0 20px rgba(244,63,94,.5); }
 
-/* Leaflet: keep tiles and controls above Tailwind resets and clickable on mobile. */
+/* Leaflet fixes: tiles must render as real 256px tiles and controls must stay clickable. */
 .leaflet-container { width:100%; height:100%; min-height:420px; z-index:1; background:#e2e8f0 !important; font-family:inherit; }
 .leaflet-pane, .leaflet-tile, .leaflet-marker-icon, .leaflet-marker-shadow, .leaflet-tile-container { position:absolute; }
 .leaflet-tile { max-width:none !important; max-height:none !important; width:256px !important; height:256px !important; display:block !important; visibility:visible !important; opacity:1 !important; }
