@@ -2,12 +2,10 @@ import {
   GoogleAuthProvider,
   browserLocalPersistence,
   createUserWithEmailAndPassword,
-  getRedirectResult,
   onAuthStateChanged,
   setPersistence,
   signInWithEmailAndPassword,
   signInWithPopup,
-  signInWithRedirect,
   signOut,
   type User,
 } from 'firebase/auth';
@@ -24,21 +22,10 @@ export const login = (email: string, password: string) =>
 
 export const loginWithGoogle = async () => {
   await setPersistence(auth, browserLocalPersistence);
-  try {
-    // Primary flow: popup keeps the user on GitHub Pages and immediately returns the credential.
-    return await signInWithPopup(auth, googleProvider);
-  } catch (error: any) {
-    // If the mobile browser blocks the popup, use Firebase's redirect flow instead.
-    const code = String(error?.code || '');
-    if (code === 'auth/popup-blocked' || code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
-      await signInWithRedirect(auth, googleProvider);
-      return null;
-    }
-    throw error;
-  }
+  return signInWithPopup(auth, googleProvider);
 };
 
-export const finishGoogleRedirect = () => getRedirectResult(auth);
+export const finishGoogleRedirect = async () => null;
 
 export const logout = () => signOut(auth);
 
