@@ -1,9 +1,12 @@
 import {
   GoogleAuthProvider,
+  browserLocalPersistence,
   createUserWithEmailAndPassword,
   getRedirectResult,
   onAuthStateChanged,
+  setPersistence,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signInWithRedirect,
   signOut,
   type User,
@@ -19,8 +22,21 @@ export const register = (email: string, password: string) =>
 export const login = (email: string, password: string) =>
   signInWithEmailAndPassword(auth, email.trim(), password);
 
-// Use Firebase redirect flow on GitHub Pages. It avoids popup blockers on Android.
-export const loginWithGoogle = () => signInWithRedirect(auth, googleProvider);
+export const loginWithGoogle = async () => {
+  await setPersistence(auth, browserLocalPersistence);
+  try {
+    // Primary flow: popup keeps the user on GitHub Pages and immediately returns the credential.
+    return await signInWithPopup(auth, googleProvider);
+  } catch (error: any) {
+    // If the mobile browser blocks the popup, use Firebase's redirect flow instead.
+    const code = String(error?.code || '');
+    if (code === 'auth/popup-blocked' || code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request') {
+      await signInWithRedirect(auth, googleProvider);
+      return null;
+    }
+    throw error;
+  }
+};
 
 export const finishGoogleRedirect = () => getRedirectResult(auth);
 
