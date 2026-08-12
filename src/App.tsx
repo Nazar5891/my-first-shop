@@ -19,9 +19,7 @@ import { DistanceRangeSlider } from './components/DistanceRangeSlider';
 import { INITIAL_LISTINGS, COMMUNITY_CENTER } from './data/mockListings';
 import { Listing, CategoryId, ActiveTab } from './types';
 import { sortListings, calculateDistanceMeters } from './utils/distance';
-import { subscribeToAuth } from './auth';
 import { db } from './firebase';
-import type { User } from 'firebase/auth';
 import { addDoc, collection, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
 import { Siren, SlidersHorizontal, Plus } from 'lucide-react';
 
@@ -41,9 +39,6 @@ export default function App() {
   const [callingListing, setCallingListing] = useState<Listing | null>(null);
   const [routingListing, setRoutingListing] = useState<Listing | null>(null);
   const [reportingListing, setReportingListing] = useState<Listing | null>(null);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-
-  useEffect(() => subscribeToAuth(setCurrentUser), []);
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'listings'), (snapshot) => {
@@ -68,12 +63,11 @@ export default function App() {
   const sortedSearchResults = useMemo(() => sortListings(filteredListings, 'distance'), [filteredListings]);
 
   const handleCreateListing = async (newListingData: Omit<Listing, 'id' | 'createdAt' | 'viewsCount' | 'callsCount' | 'distanceMeters'>): Promise<boolean> => {
-    if (!currentUser) return false;
     const createdAt = new Date().toISOString();
     try {
-      const created = await addDoc(collection(db, 'listings'), { ...newListingData, authorId: currentUser.uid, createdAt, viewsCount: 1, callsCount: 0 });
+      const created = await addDoc(collection(db, 'listings'), { ...newListingData, createdAt, viewsCount: 1, callsCount: 0 });
       const dist = calculateDistanceMeters(userCoords[0], userCoords[1], newListingData.coordinates[0], newListingData.coordinates[1]);
-      setSelectedListing({ ...newListingData, authorId: currentUser.uid, id: created.id, createdAt, viewsCount: 1, callsCount: 0, distanceMeters: dist });
+      setSelectedListing({ ...newListingData, id: created.id, createdAt, viewsCount: 1, callsCount: 0, distanceMeters: dist });
       setIsCreateModalOpen(false);
       return true;
     } catch (error) {
@@ -88,8 +82,6 @@ export default function App() {
   };
 
   const handleDeleteListing = async (id: string): Promise<boolean> => {
-    const target = listings.find((l) => l.id === id);
-    if (!target || !currentUser || target.authorId !== currentUser.uid) return false;
     try { await deleteDoc(doc(db, 'listings', id)); if (selectedListing?.id === id) setSelectedListing(null); if (detailListing?.id === id) setDetailListing(null); if (activeNavigationListing?.id === id) setActiveNavigationListing(null); return true; }
     catch (error) { console.error('Не вдалося видалити оголошення:', error); return false; }
   };
@@ -103,7 +95,7 @@ export default function App() {
           {activeTab === 'map' && <div className="relative w-full h-full flex-1 flex flex-col min-h-[calc(100vh-140px)]"><div className="flex-1 w-full h-full"><MapView listings={filteredListings} selectedListing={selectedListing} onSelectListing={setSelectedListing} userCoordinates={userCoords} setUserCoordinates={setUserCoords} activeNavigationListing={activeNavigationListing} onStopNavigation={() => setActiveNavigationListing(null)} onCallListing={setCallingListing} onRouteListing={setRoutingListing} onDetailListing={setDetailListing} maxRadiusKm={maxRadiusKm} onChangeMaxRadiusKm={setMaxRadiusKm} /></div>{urgentCount > 0 && selectedCategory === 'urgent' && <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-rose-950/90 text-rose-200 text-xs font-black px-3.5 py-1.5 rounded-full shadow-lg border border-rose-600/50 flex items-center gap-2 animate-pulse backdrop-blur-md"><Siren className="w-4 h-4 text-rose-400 shrink-0" /><span>{urgentCount} термінових запитів допомоги поруч</span><button onClick={() => setSelectedCategory('all')} className="underline text-[11px] text-rose-300 hover:text-white shrink-0 ml-1">Всі</button></div>}</div>}
           {activeTab === 'search' && <div className="p-3 sm:p-4 max-w-3xl mx-auto w-full space-y-3 pb-24 overflow-y-auto"><DistanceRangeSlider maxRadiusKm={maxRadiusKm} onChangeMaxRadiusKm={setMaxRadiusKm} filteredCount={sortedSearchResults.length} totalCount={processedListings.length} /><div className="flex items-center justify-between px-1"><div className="text-xs font-extrabold text-purple-300 uppercase tracking-widest flex items-center gap-1.5"><SlidersHorizontal className="w-3.5 h-3.5 text-purple-400" /><span>Знайдено оголошень ({sortedSearchResults.length})</span></div>{selectedCategory !== 'all' && <button onClick={() => setSelectedCategory('all')} className="text-xs font-bold text-violet-400 hover:text-violet-300 underline">Очистити фільтр</button>}</div>{sortedSearchResults.length === 0 ? <div className="cosmic-glass-card rounded-3xl p-8 text-center space-y-3 my-4"><div className="w-12 h-12 bg-purple-950/60 text-purple-300 rounded-full flex items-center justify-center mx-auto text-xl border border-purple-800/40">🌌</div><h3 className="text-base font-bold text-slate-100">Оголошень не знайдено</h3><p className="text-xs text-purple-200/70 max-w-xs mx-auto">Спробуйте змінити пошуковий запит або додайте перше оголошення у громаді!</p><button onClick={() => setIsCreateModalOpen(true)} className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-extrabold text-xs rounded-xl inline-flex items-center gap-1.5"><Plus className="w-4 h-4" /><span>Створити оголошення</span></button></div> : <div className="space-y-3">{sortedSearchResults.map((listing) => <ListingCard key={listing.id} listing={listing} onClick={() => setDetailListing(listing)} onCallClick={() => setCallingListing(listing)} variant="full" />)}</div>}</div>}
           {activeTab === 'near' && <div className="p-3 sm:p-4 max-w-3xl mx-auto w-full"><NearMeView listings={processedListings} onSelectListing={setDetailListing} onCallListing={setCallingListing} selectedCategory={selectedCategory} maxRadiusKm={maxRadiusKm} onChangeMaxRadiusKm={setMaxRadiusKm} totalListingsCount={processedListings.length} /></div>}
-          {activeTab === 'more' && <div className="p-3 sm:p-4 max-w-3xl mx-auto w-full"><MoreTab myListings={processedListings.filter((l) => l.authorId === currentUser?.uid)} allListings={processedListings} onDeleteListing={handleDeleteListing} onSelectCategoryAndSubcategory={(catId, sub) => { setSelectedCategory(catId); setSelectedSubcategory(sub || null); setActiveTab('search'); }} /></div>}
+          {activeTab === 'more' && <div className="p-3 sm:p-4 max-w-3xl mx-auto w-full"><MoreTab myListings={processedListings} allListings={processedListings} onDeleteListing={handleDeleteListing} onSelectCategoryAndSubcategory={(catId, sub) => { setSelectedCategory(catId); setSelectedSubcategory(sub || null); setActiveTab('search'); }} /></div>}
         </main>
         <ListingDetailBottomSheet listing={detailListing} onClose={() => setDetailListing(null)} onCall={setCallingListing} onRoute={(listing) => { setRoutingListing(listing); if (listing.category === 'rideshare') { setSelectedListing(listing); setActiveTab('map'); } }} onReport={setReportingListing} onAddComment={handleAddComment} />
         <CreateListingModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} onSubmit={handleCreateListing} userCoordinates={userCoords} />
