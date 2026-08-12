@@ -6,6 +6,80 @@
   }
 }
 
+:root {
+  color-scheme: dark;
+  --app-nav-height: 82px;
+  --app-safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+}
+
+html {
+  background: #08090f;
+  overflow-x: hidden;
+}
+
+body {
+  min-height: 100dvh;
+  overflow-x: hidden;
+  overscroll-behavior-y: none;
+  background: #08090f;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Keep the application header above Leaflet and map controls. */
+header {
+  position: relative;
+  z-index: 30;
+}
+
+/* The main application area leaves room for the floating bottom navigation. */
+.relative.z-10 > main {
+  min-height: 0;
+  padding-bottom: calc(var(--app-nav-height) + var(--app-safe-bottom));
+}
+
+/* Fixed dialogs and sheets always sit above the navigation and Leaflet controls. */
+.fixed.inset-0 {
+  z-index: 100 !important;
+}
+
+.fixed.inset-0 > * {
+  max-height: calc(100dvh - 24px);
+}
+
+/* Prevent long dialog content from pushing the dialog outside the viewport. */
+.fixed.inset-0 .overflow-y-auto {
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Bottom navigation stays above page content but below dialogs. */
+.fixed.bottom-0 {
+  z-index: 60 !important;
+  padding-bottom: calc(0.75rem + var(--app-safe-bottom));
+}
+
 /* Cosmic Gothic Background and Effects */
 .cosmic-bg-overlay {
   background: radial-gradient(circle at 50% 20%, rgba(124, 58, 237, 0.15), transparent 60%),
@@ -51,6 +125,10 @@
   font-family: inherit;
 }
 
+.leaflet-control-container {
+  z-index: 5;
+}
+
 .leaflet-control-zoom {
   border: 1px solid rgba(139, 92, 246, 0.3) !important;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
@@ -88,15 +166,9 @@
 
 /* Custom marker pulse animation for Urgent category */
 @keyframes urgent-pulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.9);
-  }
-  70% {
-    box-shadow: 0 0 0 16px rgba(244, 63, 94, 0);
-  }
-  100% {
-    box-shadow: 0 0 0 0 rgba(244, 63, 94, 0);
-  }
+  0% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.9); }
+  70% { box-shadow: 0 0 0 16px rgba(244, 63, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(244, 63, 94, 0); }
 }
 
 .urgent-marker-pulse {
@@ -105,23 +177,14 @@
 }
 
 @keyframes flash-glow {
-  0%, 100% {
-    opacity: 1;
-    transform: scale(1);
-    filter: drop-shadow(0 0 8px rgba(168, 85, 247, 0.8));
-  }
-  50% {
-    opacity: 0.85;
-    transform: scale(1.05);
-    filter: drop-shadow(0 0 14px rgba(244, 63, 94, 0.9));
-  }
+  0%, 100% { opacity: 1; transform: scale(1); filter: drop-shadow(0 0 8px rgba(168, 85, 246, 0.8)); }
+  50% { opacity: 0.85; transform: scale(1.05); filter: drop-shadow(0 0 14px rgba(244, 63, 94, 0.9)); }
 }
 
 .animate-flash-glow {
   animation: flash-glow 1.8s ease-in-out infinite;
 }
 
-/* Cosmic starlight shimmer animation */
 @keyframes starlight-twinkle {
   0%, 100% { opacity: 0.3; transform: scale(0.95); }
   50% { opacity: 0.9; transform: scale(1.05); }
@@ -131,27 +194,55 @@
   animation: starlight-twinkle 3s ease-in-out infinite;
 }
 
-/* Custom scrollbar for horizontal lists */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
-}
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
-}
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-/* Slide in from right animation for side panels */
 @keyframes slide-in-right {
-  from {
-    transform: translateX(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateX(0);
-    opacity: 1;
-  }
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }
 
 .animate-slide-in-right {
   animation: slide-in-right 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Mobile polish: dialogs become full-height sheets instead of overlapping the viewport. */
+@media (max-width: 640px) {
+  .fixed.inset-0 {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+
+  .fixed.inset-0 > .relative,
+  .fixed.inset-0 > .w-full {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: calc(100dvh - 8px) !important;
+    margin: 0 !important;
+    border-radius: 24px 24px 0 0 !important;
+  }
+
+  .fixed.inset-0 > .flex-1 {
+    display: none;
+  }
+
+  .leaflet-control-zoom {
+    margin-bottom: 90px !important;
+  }
+}
+
+@media (min-width: 641px) {
+  .fixed.inset-0 > .relative,
+  .fixed.inset-0 > .w-full {
+    max-height: calc(100dvh - 32px) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
