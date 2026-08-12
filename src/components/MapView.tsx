@@ -54,7 +54,7 @@ export const MapView: React.FC<MapViewProps> = ({
   selectedListing,
   onSelectListing,
 
-  userCoordinates = COMMUNITY_CENTER,
+  userCoordinates,
   setUserCoordinates,
 
   isPinSelectMode = false,
@@ -71,14 +71,17 @@ export const MapView: React.FC<MapViewProps> = ({
   onChangeMaxRadiusKm
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
-
   const mapInstanceRef = useRef<L.Map | null>(null);
+
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const markersGroupRef = useRef<L.LayerGroup | null>(null);
   const routeGroupRef = useRef<L.LayerGroup | null>(null);
+  const userMarkerRef = useRef<L.Marker | null>(null);
+  const radiusCircleRef = useRef<L.Circle | null>(null);
   const pinSelectionMarkerRef = useRef<L.Marker | null>(null);
 
-  const routeRequestRef = useRef(0);
+  const onSelectListingRef = useRef(onSelectListing);
+  const onPinSelectedRef = useRef(onPinSelected);
 
   const [mapStyle, setMapStyle] =
     useState<MapTileStyle>('light');
@@ -101,28 +104,23 @@ export const MapView: React.FC<MapViewProps> = ({
   const [currentStepIndex, setCurrentStepIndex] =
     useState(0);
 
-  const isPinSelectModeRef =
-    useRef(isPinSelectMode);
-
-  const onPinSelectedRef =
-    useRef(onPinSelected);
-
-  const onSelectListingRef =
-    useRef(onSelectListing);
+  /*
+   * -------------------------------------------------------
+   * CALLBACK REFS
+   * -------------------------------------------------------
+   */
 
   useEffect(() => {
-    isPinSelectModeRef.current = isPinSelectMode;
-    onPinSelectedRef.current = onPinSelected;
     onSelectListingRef.current = onSelectListing;
-  }, [
-    isPinSelectMode,
-    onPinSelected,
-    onSelectListing
-  ]);
+    onPinSelectedRef.current = onPinSelected;
+  }, [onSelectListing, onPinSelected]);
 
   /*
-   * КАРТИ
+   * -------------------------------------------------------
+   * MAP TILE SOURCES
+   * -------------------------------------------------------
    */
+
   const TILE_URLS: Record<
     MapTileStyle,
     { url: string; attr: string }
@@ -157,32 +155,19 @@ export const MapView: React.FC<MapViewProps> = ({
   };
 
   /*
-   * СТВОРЕННЯ КАРТИ
-   *
-   * ВАЖЛИВО:
-   * Тут НІЯКОГО автоматичного navigator.geolocation.
-   *
-   * Геолокація запускається тільки кнопкою GPS.
+   * -------------------------------------------------------
+   * INITIALIZE MAP
+   * -------------------------------------------------------
    */
-  useEffect(() => {
-    if (
-      !mapContainerRef.current ||
-      mapInstanceRef.current
-    ) {
-      return;
-    }
 
-    const initialCenter =
-      userCoordinates &&
-      Array.isArray(userCoordinates) &&
-      userCoordinates.length === 2
-        ? userCoordinates
-        : COMMUNITY_CENTER;
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+    if (mapInstanceRef.current) return;
 
     const map = L.map(
       mapContainerRef.current,
       {
-        center: initialCenter,
+        center: COMMUNITY_CENTER,
         zoom: 14,
         zoomControl: false
       }
@@ -215,46 +200,46 @@ export const MapView: React.FC<MapViewProps> = ({
 
     map.on(
       'click',
-      (e: L.LeafletMouseEvent) => {
-        if (!e?.latlng) {
-          onSelectListingRef.current?.(null);
+      (event: L.LeafletMouseEvent) => {
+        if (!event.latlng) {
+          onSelectListingRef.current(null);
           return;
         }
 
-        if (
-          isPinSelectModeRef.current &&
-          onPinSelectedRef.current
-        ) {
-          onPinSelectedRef.current([
-            e.latlng.lat,
-            e.latlng.lng
-          ]);
-        } else {
-          onSelectListingRef.current?.(null);
-        }
+        onSelectListingRef.current(null);
       }
     );
 
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 300);
+
     return () => {
       map.remove();
+
       mapInstanceRef.current = null;
+      tileLayerRef.current = null;
+      markersGroupRef.current = null;
+      routeGroupRef.current = null;
+      userMarkerRef.current = null;
+      radiusCircleRef.current = null;
     };
   }, []);
 
   /*
-   * ЗМІНА ШАРУ КАРТИ
+   * -------------------------------------------------------
+   * CHANGE MAP STYLE
+   * -------------------------------------------------------
    */
+
   useEffect(() => {
     const map = mapInstanceRef.current;
 
-    if (
-      !map ||
-      !tileLayerRef.current
-    ) {
-      return;
-    }
+    if (!map) return;
 
-    tileLayerRef.current.remove();
+    if (tileLayerRef.current) {
+      tileLayerRef.current.remove();
+    }
 
     const tileConfig = TILE_URLS[mapStyle];
 
@@ -266,136 +251,241 @@ export const MapView: React.FC<MapViewProps> = ({
           attribution: tileConfig.attr
         }
       ).addTo(map);
-
   }, [mapStyle]);
 
   /*
-   * ВИБРАНА ТОЧКА
+   * -------------------------------------------------------
+   * AUTOMATIC GPS REQUEST
+   * -------------------------------------------------------
+   *
+   * This runs once when the map opens.
+   *
+   * If permission is granted:
+   *   → get real position
+   *   → save coordinates
+   *   → move map to user
+   *
+   * If denied:
+   *   → stay in Rokytne
    */
-  useEffect(() => {
-    const map = mapInstanceRef.current;
 
-    if (!map) {
+  useEffect(() => {
+    if (!setUserCoordinates) return;
+
+    if (!navigator.geolocation) {
+      console.log(
+        'Геолокація не підтримується браузером'
+      );
       return;
     }
 
-    if (
-      isPinSelectMode &&
-      selectedPinLocation
-    ) {
-      if (
-        pinSelectionMarkerRef.current
-      ) {
-        pinSelectionMarkerRef.current.setLatLng(
-          selectedPinLocation
+    setIsLocating(true);
+
+    navigator.geolocation.getCurrentPosition(
+      position => {
+        const coords: [number, number] = [
+          position.coords.latitude,
+          position.coords.longitude
+        ];
+
+        console.log(
+          'GPS координати:',
+          coords
         );
-      } else {
-        const icon = L.divIcon({
-          className:
-            'custom-pin-select-marker',
 
-          html: `
-            <div class="relative -translate-x-1/2 -translate-y-full flex flex-col items-center">
-              <div class="bg-purple-600 text-white font-extrabold text-xs px-2.5 py-1 rounded-full shadow-lg border-2 border-purple-400 flex items-center gap-1 animate-bounce">
-                📍 Обрана точка
-              </div>
+        setUserCoordinates(coords);
 
-              <div class="w-3 h-3 bg-purple-600 rotate-45 -mt-1.5 border-r border-b border-purple-400"></div>
-            </div>
-          `,
-
-          iconSize: [0, 0],
-          iconAnchor: [0, 0]
-        });
-
-        pinSelectionMarkerRef.current =
-          L.marker(
-            selectedPinLocation,
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.flyTo(
+            coords,
+            16,
             {
-              icon,
-              interactive: false
+              animate: true,
+              duration: 1.5
             }
-          ).addTo(map);
+          );
+        }
+
+        setIsLocating(false);
+      },
+
+      error => {
+        console.log(
+          'GPS не отримано:',
+          error.message
+        );
+
+        setIsLocating(false);
+
+        /*
+         * DO NOT replace the user position
+         * with COMMUNITY_CENTER.
+         *
+         * The map simply remains on Rokytne.
+         */
+
+        if (mapInstanceRef.current) {
+          mapInstanceRef.current.flyTo(
+            COMMUNITY_CENTER,
+            14,
+            {
+              animate: true
+            }
+          );
+        }
+      },
+
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0
       }
-
-    } else if (
-      pinSelectionMarkerRef.current
-    ) {
-      pinSelectionMarkerRef.current.remove();
-      pinSelectionMarkerRef.current = null;
-    }
-
-  }, [
-    isPinSelectMode,
-    selectedPinLocation
-  ]);
+    );
+  }, [setUserCoordinates]);
 
   /*
-   * МАРКЕРИ + ПОЗИЦІЯ КОРИСТУВАЧА
+   * -------------------------------------------------------
+   * GPS MARKER
+   * -------------------------------------------------------
    */
+
   useEffect(() => {
     const map = mapInstanceRef.current;
-    const layerGroup =
-      markersGroupRef.current;
 
-    if (!map || !layerGroup) {
+    if (!map) return;
+
+    /*
+     * Remove previous marker.
+     */
+
+    if (userMarkerRef.current) {
+      userMarkerRef.current.remove();
+      userMarkerRef.current = null;
+    }
+
+    /*
+     * IMPORTANT:
+     *
+     * If there is NO real GPS coordinate,
+     * we DON'T show a fake GPS point.
+     */
+
+    if (
+      !userCoordinates ||
+      !Array.isArray(userCoordinates) ||
+      userCoordinates.length !== 2
+    ) {
       return;
     }
 
-    layerGroup.clearLayers();
-
-    /*
-     * Поточна позиція користувача.
-     *
-     * Вона НЕ клікабельна.
-     */
-    if (userCoordinates) {
-      const userIcon = L.divIcon({
+    const userIcon =
+      L.divIcon({
         className:
           'user-location-marker',
-
         html: `
-          <div class="relative -translate-x-1/2 -translate-y-1/2 flex items-center justify-center pointer-events-none">
+          <div
+            style="
+              position:relative;
+              width:50px;
+              height:50px;
+              transform:translate(-50%,-50%);
+              pointer-events:none;
+            "
+          >
 
-            <div class="w-10 h-10 rounded-full bg-cyan-500/25 animate-ping absolute pointer-events-none"></div>
+            <div
+              style="
+                position:absolute;
+                left:50%;
+                top:50%;
+                width:46px;
+                height:46px;
+                transform:translate(-50%,-50%);
+                border-radius:50%;
+                background:rgba(6,182,212,0.20);
+                animation:gpsPulse 2s infinite;
+              "
+            ></div>
 
-            <div class="w-5 h-5 rounded-full bg-cyan-400 border-2 border-white shadow-lg flex items-center justify-center shadow-cyan-500/80 pointer-events-none">
+            <div
+              style="
+                position:absolute;
+                left:50%;
+                top:50%;
+                width:20px;
+                height:20px;
+                transform:translate(-50%,-50%);
+                border-radius:50%;
+                background:#06b6d4;
+                border:3px solid white;
+                box-shadow:0 0 12px rgba(6,182,212,.9);
+              "
+            ></div>
 
-              <div class="w-2 h-2 rounded-full bg-slate-950"></div>
-
-            </div>
+            <div
+              style="
+                position:absolute;
+                left:50%;
+                top:50%;
+                width:6px;
+                height:6px;
+                transform:translate(-50%,-50%);
+                border-radius:50%;
+                background:#0f172a;
+              "
+            ></div>
 
           </div>
-        `,
 
-        iconSize: [0, 0]
+          <style>
+            @keyframes gpsPulse {
+              0% {
+                transform:translate(-50%,-50%) scale(.7);
+                opacity:.9;
+              }
+              70% {
+                transform:translate(-50%,-50%) scale(1.4);
+                opacity:0;
+              }
+              100% {
+                opacity:0;
+              }
+            }
+          </style>
+        `,
+        iconSize: [50, 50],
+        iconAnchor: [25, 25]
       });
 
+    userMarkerRef.current =
       L.marker(
         userCoordinates,
         {
           icon: userIcon,
-          zIndexOffset: 1000,
+          zIndexOffset: 2000,
           interactive: false,
-          bubblingMouseEvents: false,
-          keyboard: false
+          bubblingMouseEvents: false
         }
-      ).addTo(layerGroup);
+      ).addTo(map);
 
-      /*
-       * Радіус пошуку
-       */
-      if (
-        maxRadiusKm !== null &&
-        Array.isArray(userCoordinates) &&
-        userCoordinates.length === 2
-      ) {
+    /*
+     * Radius circle
+     */
+
+    if (radiusCircleRef.current) {
+      radiusCircleRef.current.remove();
+      radiusCircleRef.current = null;
+    }
+
+    if (
+      maxRadiusKm !== null &&
+      maxRadiusKm > 0
+    ) {
+      radiusCircleRef.current =
         L.circle(
           userCoordinates,
           {
-            radius:
-              maxRadiusKm * 1000,
-
+            radius: maxRadiusKm * 1000,
             color: '#c084fc',
             fillColor: '#a855f7',
             fillOpacity: 0.12,
@@ -403,101 +493,17 @@ export const MapView: React.FC<MapViewProps> = ({
             dashArray: '6, 8',
             interactive: false
           }
-        ).addTo(layerGroup);
-      }
+        ).addTo(map);
     }
 
-    /*
-     * МАРКЕРИ ОГОЛОШЕНЬ
-     */
-    listings.forEach(
-      (listing) => {
-        if (
-          !listing?.coordinates ||
-          !Array.isArray(
-            listing.coordinates
-          ) ||
-          listing.coordinates.length < 2 ||
-          typeof listing.coordinates[0] !==
-            'number' ||
-          typeof listing.coordinates[1] !==
-            'number'
-        ) {
-          return;
-        }
-
-        const isSelected =
-          selectedListing?.id ===
-          listing.id;
-
-        const isNavTarget =
-          activeNavigationListing?.id ===
-          listing.id;
-
-        const icon = L.divIcon({
-          className:
-            'custom-listing-marker',
-
-          html:
-            renderMarkerHtml(
-              listing,
-              isSelected,
-              isNavTarget
-            ),
-
-          iconSize: [0, 0]
-        });
-
-        const marker =
-          L.marker(
-            listing.coordinates,
-            {
-              icon
-            }
-          );
-
-        marker.addTo(layerGroup);
-
-        marker.on(
-          'click',
-          (
-            e: L.LeafletMouseEvent
-          ) => {
-            if (e?.originalEvent) {
-              L.DomEvent.stopPropagation(
-                e
-              );
-            }
-
-            onSelectListingRef.current?.(
-              listing
-            );
-
-            mapInstanceRef.current?.panTo(
-              listing.coordinates,
-              {
-                animate: true
-              }
-            );
-          }
-        );
-      }
-    );
-
-  }, [
-    listings,
-    selectedListing,
-    userCoordinates,
-    activeNavigationListing,
-    maxRadiusKm
-  ]);
+  }, [userCoordinates, maxRadiusKm]);
 
   /*
-   * GPS
-   *
-   * СИСТЕМНИЙ ЗАПИТ З'ЯВЛЯЄТЬСЯ
-   * ТІЛЬКИ ПІСЛЯ НАТИСКАННЯ КНОПКИ.
+   * -------------------------------------------------------
+   * MANUAL GPS BUTTON
+   * -------------------------------------------------------
    */
+
   const handleGPSLocate = () => {
     if (!navigator.geolocation) {
       alert(
@@ -506,69 +512,40 @@ export const MapView: React.FC<MapViewProps> = ({
       return;
     }
 
-    if (!setUserCoordinates) {
-      alert(
-        'Функція геолокації недоступна.'
-      );
-      return;
-    }
-
     setIsLocating(true);
 
     navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const coords: [
-          number,
-          number
-        ] = [
+      position => {
+        const coords: [number, number] = [
           position.coords.latitude,
           position.coords.longitude
         ];
 
-        setUserCoordinates(coords);
+        setUserCoordinates?.(coords);
 
         mapInstanceRef.current?.flyTo(
           coords,
           16,
           {
             animate: true,
-            duration: 1.2
+            duration: 1.5
           }
         );
 
         setIsLocating(false);
       },
 
-      (error) => {
-        console.error(
-          'Geolocation error:',
-          error
+      error => {
+        console.log(
+          'Помилка GPS:',
+          error.message
         );
 
         setIsLocating(false);
 
-        if (
-          error.code ===
-          error.PERMISSION_DENIED
-        ) {
-          alert(
-            'Ви заборонили доступ до геолокації. Дозвольте доступ у налаштуваннях браузера.'
-          );
-        } else if (
-          error.code ===
-          error.POSITION_UNAVAILABLE
-        ) {
-          alert(
-            'Не вдалося визначити ваше місцезнаходження.'
-          );
-        } else if (
-          error.code ===
-          error.TIMEOUT
-        ) {
-          alert(
-            'Час очікування геолокації вичерпано. Спробуйте ще раз.'
-          );
-        }
+        alert(
+          'Не вдалося отримати ваше місцезнаходження. Перевірте дозвіл на геолокацію для сайту.'
+        );
       },
 
       {
@@ -580,438 +557,296 @@ export const MapView: React.FC<MapViewProps> = ({
   };
 
   /*
-   * ЦЕНТР КАРТИ
+   * -------------------------------------------------------
+   * PIN SELECT MODE
+   * -------------------------------------------------------
    */
-  const handleRecenter = () => {
-    if (!mapInstanceRef.current) {
-      return;
-    }
 
-    mapInstanceRef.current.flyTo(
-      userCoordinates,
-      15,
-      {
-        animate: true
-      }
-    );
-  };
-
-  /*
-   * СПРАВЖНІЙ МАРШРУТ ПО ДОРОГАХ
-   *
-   * Використовується OSRM.
-   *
-   * ВАЖЛИВО:
-   * Leaflet більше НЕ малює
-   * просту пряму лінію.
-   */
   useEffect(() => {
     const map = mapInstanceRef.current;
-    const routeGroup =
-      routeGroupRef.current;
 
-    if (!map || !routeGroup) {
-      return;
-    }
+    if (!map) return;
 
-    routeGroup.clearLayers();
+    if (
+      isPinSelectMode &&
+      selectedPinLocation
+    ) {
+      const icon =
+        L.divIcon({
+          className:
+            'custom-pin-select-marker',
+          html: `
+            <div
+              style="
+                transform:translate(-50%,-100%);
+                display:flex;
+                flex-direction:column;
+                align-items:center;
+              "
+            >
+              <div
+                style="
+                  background:#9333ea;
+                  color:white;
+                  font-weight:800;
+                  font-size:12px;
+                  padding:6px 10px;
+                  border-radius:999px;
+                  border:2px solid #c084fc;
+                  box-shadow:0 4px 15px rgba(0,0,0,.4);
+                  white-space:nowrap;
+                "
+              >
+                📍 Обрана точка
+              </div>
 
-    const requestId =
-      ++routeRequestRef.current;
-
-    /*
-     * Навігація до об'єкта
-     */
-    if (activeNavigationListing) {
-      const start: [
-        number,
-        number
-      ] = userCoordinates;
-
-      const end: [
-        number,
-        number
-      ] =
-        activeNavigationListing.coordinates;
-
-      const startLon = start[1];
-      const startLat = start[0];
-
-      const endLon = end[1];
-      const endLat = end[0];
-
-      const url =
-        `https://router.project-osrm.org/route/v1/driving/` +
-        `${startLon},${startLat};${endLon},${endLat}` +
-        `?overview=full&geometries=geojson&steps=true`;
-
-      fetch(url)
-        .then((response) => {
-          if (!response.ok) {
-            throw new Error(
-              'OSRM route error'
-            );
-          }
-
-          return response.json();
-        })
-        .then((data) => {
-          if (
-            requestId !==
-            routeRequestRef.current
-          ) {
-            return;
-          }
-
-          if (
-            !data?.routes?.length
-          ) {
-            throw new Error(
-              'Маршрут не знайдено'
-            );
-          }
-
-          const route =
-            data.routes[0];
-
-          const coordinates =
-            route.geometry.coordinates.map(
-              (point: [
-                number,
-                number
-              ]) => [
-                point[1],
-                point[0]
-              ] as [
-                number,
-                number
-              ]
-            );
-
-          /*
-           * Тінь маршруту
-           */
-          L.polyline(
-            coordinates,
-            {
-              color: '#0284c7',
-              weight: 10,
-              opacity: 0.35,
-              lineCap: 'round',
-              lineJoin: 'round',
-              interactive: false
-            }
-          ).addTo(routeGroup);
-
-          /*
-           * Основний маршрут
-           */
-          L.polyline(
-            coordinates,
-            {
-              color: '#06b6d4',
-              weight: 6,
-              opacity: 0.95,
-              lineCap: 'round',
-              lineJoin: 'round',
-              interactive: false
-            }
-          ).addTo(routeGroup);
-
-          /*
-           * Початок маршруту
-           */
-          L.circleMarker(
-            start,
-            {
-              radius: 7,
-              color: '#ffffff',
-              weight: 3,
-              fillColor: '#06b6d4',
-              fillOpacity: 1,
-              interactive: false
-            }
-          ).addTo(routeGroup);
-
-          /*
-           * Кінець маршруту
-           */
-          const destinationIcon =
-            L.divIcon({
-              className:
-                'destination-flag-marker',
-
-              html: `
-                <div class="relative -translate-x-1/2 -translate-y-full flex flex-col items-center">
-
-                  <div class="bg-slate-950 text-sky-300 font-black text-[11px] px-2.5 py-1 rounded-full shadow-xl border-2 border-sky-400 flex items-center gap-1.5 whitespace-nowrap">
-
-                    <span>
-                      🏁 ${
-                        activeNavigationListing.locationName ||
-                        activeNavigationListing.title
-                      }
-                    </span>
-
-                  </div>
-
-                  <div class="w-2.5 h-2.5 bg-sky-400 rotate-45 -mt-1"></div>
-
-                </div>
-              `,
-
-              iconSize: [0, 0],
-              iconAnchor: [0, 0]
-            });
-
-          L.marker(
-            end,
-            {
-              icon: destinationIcon,
-              zIndexOffset: 900,
-              interactive: false
-            }
-          ).addTo(routeGroup);
-
-          /*
-           * Показуємо весь маршрут
-           */
-          const bounds =
-            L.latLngBounds(
-              coordinates
-            );
-
-          map.fitBounds(
-            bounds,
-            {
-              padding: [80, 80],
-              animate: true
-            }
-          );
-        })
-        .catch((error) => {
-          console.error(
-            'Не вдалося побудувати маршрут:',
-            error
-          );
-
-          if (
-            requestId !==
-            routeRequestRef.current
-          ) {
-            return;
-          }
-
-          /*
-           * Якщо сервіс маршрутизації
-           * недоступний — показуємо
-           * пунктир як запасний варіант.
-           */
-          L.polyline(
-            [start, end],
-            {
-              color: '#06b6d4',
-              weight: 5,
-              opacity: 0.7,
-              dashArray: '10, 10',
-              interactive: false
-            }
-          ).addTo(routeGroup);
-
-          map.fitBounds(
-            [start, end],
-            {
-              padding: [70, 70],
-              animate: true
-            }
-          );
+              <div
+                style="
+                  width:12px;
+                  height:12px;
+                  background:#9333ea;
+                  transform:rotate(45deg);
+                  margin-top:-5px;
+                "
+              ></div>
+            </div>
+          `,
+          iconSize: [0, 0],
+          iconAnchor: [0, 0]
         });
 
-      return;
+      if (pinSelectionMarkerRef.current) {
+        pinSelectionMarkerRef.current.setLatLng(
+          selectedPinLocation
+        );
+      } else {
+        pinSelectionMarkerRef.current =
+          L.marker(
+            selectedPinLocation,
+            {
+              icon,
+              interactive: false
+            }
+          ).addTo(map);
+      }
+
+    } else {
+
+      if (pinSelectionMarkerRef.current) {
+        pinSelectionMarkerRef.current.remove();
+        pinSelectionMarkerRef.current = null;
+      }
+
     }
 
-    /*
-     * МАРШРУТ ПОЇЗДКИ / RIDESHARE
-     */
-    if (
-      selectedListing &&
-      (
-        selectedListing.category ===
-          'rideshare' ||
-        selectedListing.destinationCoordinates
-      ) &&
-      selectedListing.coordinates
-    ) {
-      const start: [
-        number,
-        number
-      ] =
-        selectedListing.coordinates;
+  }, [
+    isPinSelectMode,
+    selectedPinLocation
+  ]);
 
-      const destination =
-        selectedListing.destinationCoordinates;
+  /*
+   * -------------------------------------------------------
+   * LISTING MARKERS
+   * -------------------------------------------------------
+   */
+
+  useEffect(() => {
+    const map = mapInstanceRef.current;
+    const layer = markersGroupRef.current;
+
+    if (!map || !layer) return;
+
+    layer.clearLayers();
+
+    listings.forEach(listing => {
 
       if (
-        !destination ||
-        !Array.isArray(destination) ||
-        destination.length !== 2
+        !listing?.coordinates ||
+        !Array.isArray(listing.coordinates) ||
+        listing.coordinates.length < 2
       ) {
         return;
       }
 
-      const startLon = start[1];
-      const startLat = start[0];
+      const isSelected =
+        selectedListing?.id === listing.id;
 
-      const endLon = destination[1];
-      const endLat = destination[0];
+      const isNavTarget =
+        activeNavigationListing?.id === listing.id;
 
-      const url =
-        `https://router.project-osrm.org/route/v1/driving/` +
-        `${startLon},${startLat};${endLon},${endLat}` +
-        `?overview=full&geometries=geojson`;
-
-      fetch(url)
-        .then((response) => {
-          if (!response.ok) {
-            throw new Error(
-              'OSRM route error'
-            );
-          }
-
-          return response.json();
-        })
-        .then((data) => {
-          if (
-            !data?.routes?.length
-          ) {
-            return;
-          }
-
-          const route =
-            data.routes[0];
-
-          const coordinates =
-            route.geometry.coordinates.map(
-              (point: [
-                number,
-                number
-              ]) => [
-                point[1],
-                point[0]
-              ] as [
-                number,
-                number
-              ]
-            );
-
-          L.polyline(
-            coordinates,
-            {
-              color: '#0284c7',
-              weight: 9,
-              opacity: 0.3,
-              lineCap: 'round',
-              lineJoin: 'round',
-              interactive: false
-            }
-          ).addTo(routeGroup);
-
-          L.polyline(
-            coordinates,
-            {
-              color: '#38bdf8',
-              weight: 5,
-              opacity: 0.95,
-              lineCap: 'round',
-              lineJoin: 'round',
-              interactive: false
-            }
-          ).addTo(routeGroup);
-
-          const destinationIcon =
-            L.divIcon({
-              className:
-                'destination-flag-marker',
-
-              html: `
-                <div class="relative -translate-x-1/2 -translate-y-full flex flex-col items-center">
-
-                  <div class="bg-slate-950 text-sky-300 font-black text-[11px] px-2.5 py-1 rounded-full shadow-xl border-2 border-sky-400 flex items-center gap-1.5 whitespace-nowrap">
-
-                    <span>
-                      🏁 ${
-                        selectedListing.rideRouteTo ||
-                        'Пункт призначення'
-                      }
-                    </span>
-
-                  </div>
-
-                  <div class="w-2.5 h-2.5 bg-sky-400 rotate-45 -mt-1"></div>
-
-                </div>
-              `,
-
-              iconSize: [0, 0],
-              iconAnchor: [0, 0]
-            });
-
-          L.marker(
-            destination,
-            {
-              icon: destinationIcon,
-              zIndexOffset: 900,
-              interactive: false
-            }
-          ).addTo(routeGroup);
-
-          map.fitBounds(
-            L.latLngBounds(
-              coordinates
+      const icon =
+        L.divIcon({
+          className:
+            'custom-listing-marker',
+          html:
+            renderMarkerHtml(
+              listing,
+              isSelected,
+              isNavTarget
             ),
+          iconSize: [0, 0]
+        });
+
+      const marker =
+        L.marker(
+          listing.coordinates,
+          {
+            icon
+          }
+        ).addTo(layer);
+
+      marker.on(
+        'click',
+        event => {
+
+          if (event.originalEvent) {
+            L.DomEvent.stopPropagation(
+              event.originalEvent
+            );
+          }
+
+          onSelectListingRef.current(
+            listing
+          );
+
+          map.panTo(
+            listing.coordinates,
             {
-              padding: [80, 80],
               animate: true
             }
           );
-        })
-        .catch((error) => {
-          console.error(
-            'Route error:',
-            error
-          );
-        });
+        }
+      );
+    });
+
+  }, [
+    listings,
+    selectedListing,
+    activeNavigationListing
+  ]);
+
+  /*
+   * -------------------------------------------------------
+   * ROUTE DISPLAY
+   * -------------------------------------------------------
+   *
+   * IMPORTANT:
+   * We do NOT pretend that a straight line
+   * is a road route.
+   *
+   * Actual road routing should be done through
+   * OSRM / another routing service.
+   */
+
+  useEffect(() => {
+
+    const map = mapInstanceRef.current;
+    const routeGroup = routeGroupRef.current;
+
+    if (!map || !routeGroup) return;
+
+    routeGroup.clearLayers();
+
+    if (!activeNavigationListing) {
+      return;
     }
+
+    if (
+      !userCoordinates ||
+      !activeNavigationListing.coordinates
+    ) {
+      return;
+    }
+
+    /*
+     * Only show a subtle connection line for now.
+     * It is NOT presented as an actual road route.
+     */
+
+    const start: [number, number] =
+      userCoordinates;
+
+    const end: [number, number] =
+      activeNavigationListing.coordinates;
+
+    L.polyline(
+      [start, end],
+      {
+        color: '#06b6d4',
+        weight: 4,
+        opacity: 0.45,
+        dashArray: '8, 10',
+        interactive: false
+      }
+    ).addTo(routeGroup);
+
+    map.fitBounds(
+      [start, end],
+      {
+        padding: [80, 80],
+        animate: true
+      }
+    );
 
   }, [
     activeNavigationListing,
-    selectedListing,
     userCoordinates
   ]);
 
   /*
-   * КРОКИ НАВІГАЦІЇ
+   * -------------------------------------------------------
+   * RECENTER
+   * -------------------------------------------------------
    */
+
+  const handleRecenter = () => {
+
+    if (
+      userCoordinates &&
+      Array.isArray(userCoordinates)
+    ) {
+
+      mapInstanceRef.current?.flyTo(
+        userCoordinates,
+        16,
+        {
+          animate: true
+        }
+      );
+
+    } else {
+
+      mapInstanceRef.current?.flyTo(
+        COMMUNITY_CENTER,
+        14,
+        {
+          animate: true
+        }
+      );
+
+    }
+  };
+
+  /*
+   * -------------------------------------------------------
+   * NAVIGATION STEPS
+   * -------------------------------------------------------
+   */
+
   const navSteps =
     activeNavigationListing
       ? [
           'Старт від вашої позиції',
-
-          `Рухайтеся дорогою в напрямку ${
-            activeNavigationListing.locationName
-          }`,
-
-          `Приблизна відстань: ${
-            formatDistance(
-              activeNavigationListing.distanceMeters
-            )
-          }`,
-
-          `Прибуття до «${
-            activeNavigationListing.title
-          }»`
+          `Рухайтеся в напрямку ${activeNavigationListing.locationName}`,
+          `Прибуття до «${activeNavigationListing.title}»`
         ]
       : [];
+
+  /*
+   * -------------------------------------------------------
+   * RENDER
+   * -------------------------------------------------------
+   */
 
   return (
     <div className="relative w-full h-full min-h-[420px] flex-1">
@@ -1021,310 +856,25 @@ export const MapView: React.FC<MapViewProps> = ({
         className="w-full h-full rounded-2xl overflow-hidden shadow-inner border border-purple-900/30"
       />
 
-      /*
-       * АКТИВНА НАВІГАЦІЯ
-       */
-      {activeNavigationListing &&
-        !isNavHudMinimized && (
-          <div className="absolute top-3 left-3 right-16 z-30 max-w-lg bg-slate-950/95 border-2 border-cyan-500 rounded-2xl p-3 shadow-2xl backdrop-blur-xl space-y-2 text-slate-100">
-
-            <div className="flex items-center justify-between gap-2 border-b border-cyan-900/50 pb-2">
-
-              <div className="flex items-center gap-2 truncate">
-
-                <div className="w-7 h-7 rounded-lg bg-cyan-500 text-slate-950 flex items-center justify-center font-black animate-pulse shrink-0">
-
-                  <Navigation className="w-4 h-4 fill-slate-950" />
-
-                </div>
-
-                <div className="truncate">
-
-                  <span className="text-[9px] font-black text-cyan-400 uppercase tracking-widest block">
-                    АКТИВНИЙ МАРШРУТ
-                  </span>
-
-                  <h4 className="font-extrabold text-xs text-white truncate">
-                    {activeNavigationListing.title}
-                  </h4>
-
-                </div>
-
-              </div>
-
-              <div className="flex items-center gap-1 shrink-0">
-
-                <button
-                  onClick={() =>
-                    setIsNavHudMinimized(true)
-                  }
-                  className="px-2 py-1 rounded-lg bg-slate-900 text-cyan-300 border border-cyan-800/40 text-[10px] font-extrabold"
-                >
-                  — Згорнути
-                </button>
-
-                <button
-                  onClick={onStopNavigation}
-                  className="p-1 rounded-lg bg-slate-900 text-rose-300 border border-rose-800/50"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-
-              </div>
-            </div>
-
-            <div className="grid grid-cols-3 gap-1.5 text-center text-xs font-bold">
-
-              <div className="bg-slate-900/90 p-1.5 rounded-xl border border-purple-900/40">
-
-                <span className="text-[9px] text-purple-300/80 block uppercase">
-                  Відстань
-                </span>
-
-                <span className="text-cyan-300 font-black text-xs">
-                  {formatDistance(
-                    activeNavigationListing.distanceMeters
-                  )}
-                </span>
-
-              </div>
-
-              <div className="bg-slate-900/90 p-1.5 rounded-xl border border-purple-900/40 flex items-center justify-center gap-1">
-
-                <Car className="w-3.5 h-3.5 text-purple-400" />
-
-                <div>
-
-                  <span className="text-[9px] text-purple-300/80 block uppercase">
-                    Авто
-                  </span>
-
-                  <span className="text-white font-black text-xs">
-                    ~
-                    {Math.max(
-                      1,
-                      Math.round(
-                        (
-                          activeNavigationListing.distanceMeters /
-                          1000 /
-                          40
-                        ) * 60
-                      )
-                    )}
-                    {' '}хв
-                  </span>
-
-                </div>
-
-              </div>
-
-              <div className="bg-slate-900/90 p-1.5 rounded-xl border border-purple-900/40 flex items-center justify-center gap-1">
-
-                <Footprints className="w-3.5 h-3.5 text-purple-400" />
-
-                <div>
-
-                  <span className="text-[9px] text-purple-300/80 block uppercase">
-                    Пішки
-                  </span>
-
-                  <span className="text-white font-black text-xs">
-                    ~
-                    {Math.round(
-                      (
-                        activeNavigationListing.distanceMeters /
-                        1000 /
-                        4
-                      ) * 60
-                    )}
-                    {' '}хв
-                  </span>
-
-                </div>
-
-              </div>
-
-            </div>
-
-            <div className="bg-cyan-950/60 p-2 rounded-xl border border-cyan-800/50 text-[11px] font-semibold text-cyan-200 flex items-center justify-between">
-
-              <div className="flex items-center gap-1.5 truncate pr-1">
-
-                <ChevronRight className="w-3.5 h-3.5 text-cyan-400" />
-
-                <span className="truncate">
-                  {navSteps[
-                    currentStepIndex
-                  ]}
-                </span>
-
-              </div>
-
-              {navSteps.length > 1 && (
-                <button
-                  onClick={() =>
-                    setCurrentStepIndex(
-                      (p) =>
-                        (p + 1) %
-                        navSteps.length
-                    )
-                  }
-                  className="text-[9px] font-extrabold bg-cyan-600 text-slate-950 px-2 py-0.5 rounded-md"
-                >
-                  Далі →
-                </button>
-              )}
-
-            </div>
-
-          </div>
-        )}
-
-      /*
-       * МІНІМАЛЬНИЙ HUD
-       */
-      {activeNavigationListing &&
-        isNavHudMinimized && (
-          <div className="absolute top-3 left-3 z-30 bg-slate-950/90 border border-cyan-400 text-cyan-200 px-3 py-1.5 rounded-full shadow-xl backdrop-blur-md flex items-center gap-2 text-xs font-bold">
-
-            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping"></span>
-
-            <span className="truncate max-w-[160px] sm:max-w-xs">
-              🧭 {activeNavigationListing.title}
-            </span>
-
-            <button
-              onClick={() =>
-                setIsNavHudMinimized(false)
-              }
-              className="bg-cyan-500 text-slate-950 px-2 py-0.5 rounded-full text-[10px] font-black"
-            >
-              Розгорнути
-            </button>
-
-            <button
-              onClick={onStopNavigation}
-              className="p-1"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-
-          </div>
-        )}
-
-      /*
-       * ВИБІР ТОЧКИ
-       */
-      {isPinSelectMode && (
-        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-purple-900/90 text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg border border-purple-400/50 flex items-center gap-2 animate-bounce backdrop-blur-md">
-
-          <span>
-            📍 Натисніть на карту, щоб вибрати точку
-          </span>
-
+      {isLocating && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-50 bg-slate-950/95 text-cyan-300 border border-cyan-500 rounded-full px-4 py-2 text-xs font-bold shadow-xl">
+          📍 Визначаємо ваше місцезнаходження…
         </div>
       )}
 
-      /*
-       * ЛІВА ПАНЕЛЬ
-       */
-      <div className="absolute top-3 left-3 z-20 flex flex-col items-start gap-2">
-
-        <div className="flex items-center gap-2">
-
-          <button
-            onClick={() => {
-              setShowRadiusMenu(
-                !showRadiusMenu
-              );
-
-              if (!showRadiusMenu) {
-                setShowLegend(false);
-              }
-            }}
-            className={`p-2.5 rounded-xl shadow-lg border font-bold text-xs flex items-center gap-1.5 transition-all backdrop-blur-md ${
-              maxRadiusKm !== null
-                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white border-purple-400'
-                : 'bg-slate-950/85 text-purple-200 border-purple-800/60'
-            }`}
-          >
-            <Compass className="w-4 h-4 text-purple-300" />
-
-            <span>
-              Радіус:{' '}
-              {maxRadiusKm !== null
-                ? `${maxRadiusKm} км`
-                : 'Всі'}
-            </span>
-
-          </button>
-
-          <button
-            onClick={() => {
-              setShowLegend(
-                !showLegend
-              );
-
-              if (!showLegend) {
-                setShowRadiusMenu(false);
-              }
-            }}
-            className={`p-2.5 rounded-xl shadow-lg border font-bold text-xs flex items-center gap-1.5 transition-all backdrop-blur-md ${
-              showLegend
-                ? 'bg-purple-600 text-white border-purple-300'
-                : 'bg-slate-950/85 text-purple-200 border-purple-800/60'
-            }`}
-          >
-            <Info className="w-4 h-4 text-purple-300" />
-
-            <span className="hidden sm:inline">
-              Легенда
-            </span>
-
-          </button>
-
+      {isPinSelectMode && (
+        <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 bg-purple-900/95 text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg border border-purple-400/50">
+          📍 Натисніть на карту, щоб вибрати точку
         </div>
+      )}
 
-        {showRadiusMenu && (
-          <div className="w-72 sm:w-80 animate-slide-down shadow-2xl z-30">
+      <div className="absolute top-3 left-3 z-30 flex flex-col gap-2">
 
-            <DistanceRangeSlider
-              maxRadiusKm={maxRadiusKm}
-              onChangeMaxRadiusKm={
-                onChangeMaxRadiusKm
-              }
-              filteredCount={
-                listings.length
-              }
-              compact
-            />
-
-          </div>
-        )}
-
-      </div>
-
-      /*
-       * ПРАВА ПАНЕЛЬ
-       */
-      <div
-        className={`absolute top-3 ${
-          selectedListing
-            ? 'right-3 sm:right-[400px] md:right-[420px]'
-            : 'right-3'
-        } z-20 flex flex-col items-end gap-2`}
-      >
-
-        /*
-         * GPS
-         */
         <button
           onClick={handleGPSLocate}
           disabled={isLocating}
-          className="p-2.5 rounded-xl shadow-lg border font-bold text-xs flex items-center gap-1.5 bg-slate-950/85 text-cyan-300 border-cyan-800/60"
-          title="Визначити моє місцезнаходження"
+          className="p-2.5 rounded-xl shadow-lg border font-bold text-xs flex items-center gap-1.5 bg-slate-950/90 text-cyan-300 border-cyan-800/60"
         >
-
           <Crosshair
             className={
               isLocating
@@ -1335,15 +885,49 @@ export const MapView: React.FC<MapViewProps> = ({
 
           <span className="hidden sm:inline">
             {isLocating
-              ? 'Визначення...'
-              : 'GPS Точка'}
+              ? 'Пошук GPS…'
+              : 'Моє місце'}
           </span>
-
         </button>
 
-        /*
-         * ШАРИ
-         */
+        <button
+          onClick={() => {
+            setShowRadiusMenu(
+              !showRadiusMenu
+            );
+            setShowLegend(false);
+          }}
+          className="p-2.5 rounded-xl shadow-lg border font-bold text-xs flex items-center gap-1.5 bg-slate-950/90 text-purple-200 border-purple-800/60"
+        >
+          <Compass className="w-4 h-4" />
+
+          <span className="hidden sm:inline">
+            Радіус:{' '}
+            {maxRadiusKm !== null
+              ? `${maxRadiusKm} км`
+              : 'Всі'}
+          </span>
+        </button>
+
+        {showRadiusMenu && (
+          <div className="w-72 sm:w-80 shadow-2xl">
+            <DistanceRangeSlider
+              maxRadiusKm={maxRadiusKm}
+              onChangeMaxRadiusKm={
+                onChangeMaxRadiusKm
+              }
+              filteredCount={
+                listings.length
+              }
+              compact
+            />
+          </div>
+        )}
+
+      </div>
+
+      <div className="absolute top-3 right-3 z-30 flex flex-col gap-2">
+
         <div className="relative">
 
           <button
@@ -1352,15 +936,9 @@ export const MapView: React.FC<MapViewProps> = ({
                 !showStyleMenu
               )
             }
-            className="p-2.5 rounded-xl bg-slate-950/85 text-purple-200 border border-purple-800/50 shadow-lg font-bold text-xs flex items-center gap-1.5"
+            className="p-2.5 rounded-xl bg-slate-950/90 text-purple-200 border border-purple-800/50 shadow-lg"
           >
-
-            <Layers className="w-4 h-4 text-purple-400" />
-
-            <span className="hidden sm:inline">
-              Шар карти
-            </span>
-
+            <Layers className="w-4 h-4" />
           </button>
 
           {showStyleMenu && (
@@ -1373,7 +951,7 @@ export const MapView: React.FC<MapViewProps> = ({
                   'satellite',
                   'dark'
                 ] as MapTileStyle[]
-              ).map((style) => (
+              ).map(style => (
 
                 <button
                   key={style}
@@ -1387,18 +965,16 @@ export const MapView: React.FC<MapViewProps> = ({
                       : 'text-purple-200'
                   }`}
                 >
-
                   {style === 'light'
                     ? '☀️ Світла карта'
                     : style === 'streets'
-                    ? '🗺️ Вулиці / Схема'
+                    ? '🗺️ Вулиці'
                     : style === 'satellite'
                     ? '🛰️ Супутник'
-                    : '🌌 Космічна ніч'}
+                    : '🌌 Нічна карта'}
 
                   {mapStyle === style &&
                     ' ✓'}
-
                 </button>
 
               ))}
@@ -1408,244 +984,248 @@ export const MapView: React.FC<MapViewProps> = ({
 
         </div>
 
-        /*
-         * ЦЕНТР
-         */
         <button
           onClick={handleRecenter}
-          className="p-2.5 rounded-xl bg-slate-950/85 text-purple-200 border border-purple-800/50 shadow-lg font-bold text-xs flex items-center gap-1.5"
-          title="Повернутися до поточної точки"
+          className="p-2.5 rounded-xl bg-slate-950/90 text-purple-200 border border-purple-800/50 shadow-lg"
         >
-
-          <Compass className="w-4 h-4 text-purple-400" />
-
-          <span className="hidden sm:inline">
-            Центр
-          </span>
-
+          <Compass className="w-4 h-4" />
         </button>
 
       </div>
 
-      /*
-       * ІНФОРМАЦІЙНИЙ НАПИС
-       */
       {!activeNavigationListing && (
-        <div className="absolute top-3 left-3 z-10 bg-slate-950/85 backdrop-blur-md px-3 py-1.5 rounded-xl shadow-md border border-purple-800/50 text-[11px] font-bold text-purple-200 flex items-center gap-2">
+        <div className="absolute bottom-3 left-3 z-20 bg-slate-950/85 backdrop-blur-md px-3 py-1.5 rounded-xl shadow-md border border-purple-800/50 text-[11px] font-bold text-purple-200">
+          <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block mr-2" />
+          Рокитне • онлайн-карта
+        </div>
+      )}
 
-          <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+      {activeNavigationListing &&
+        !isNavHudMinimized && (
 
-          <span>
-            Рівненська область • Онлайн-карта
-          </span>
+        <div className="absolute top-3 left-3 right-16 z-40 max-w-lg bg-slate-950/95 border-2 border-cyan-500 rounded-2xl p-3 shadow-2xl text-slate-100">
+
+          <div className="flex items-center justify-between gap-2">
+
+            <div className="flex items-center gap-2">
+
+              <Navigation className="w-5 h-5 text-cyan-400" />
+
+              <div>
+
+                <div className="text-[9px] font-black text-cyan-400">
+                  АКТИВНИЙ МАРШРУТ
+                </div>
+
+                <div className="font-extrabold text-xs">
+                  {activeNavigationListing.title}
+                </div>
+
+              </div>
+
+            </div>
+
+            <button
+              onClick={onStopNavigation}
+              className="p-1 rounded-lg bg-slate-900 text-rose-300"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
+          </div>
+
+          <div className="grid grid-cols-3 gap-2 mt-3">
+
+            <div className="bg-slate-900 p-2 rounded-xl text-center">
+              <span className="text-[9px] text-purple-300 block">
+                Відстань
+              </span>
+
+              <span className="text-cyan-300 font-black text-xs">
+                {formatDistance(
+                  activeNavigationListing.distanceMeters
+                )}
+              </span>
+            </div>
+
+            <div className="bg-slate-900 p-2 rounded-xl text-center">
+              <Car className="w-4 h-4 mx-auto text-purple-400" />
+
+              <span className="text-[9px] text-purple-300 block">
+                Авто
+              </span>
+
+              <span className="text-white font-black text-xs">
+                ~
+                {Math.max(
+                  1,
+                  Math.round(
+                    (
+                      activeNavigationListing.distanceMeters /
+                      1000 /
+                      40
+                    ) * 60
+                  )
+                )}{' '}
+                хв
+              </span>
+            </div>
+
+            <div className="bg-slate-900 p-2 rounded-xl text-center">
+              <Footprints className="w-4 h-4 mx-auto text-purple-400" />
+
+              <span className="text-[9px] text-purple-300 block">
+                Пішки
+              </span>
+
+              <span className="text-white font-black text-xs">
+                ~
+                {Math.round(
+                  (
+                    activeNavigationListing.distanceMeters /
+                    1000 /
+                    4
+                  ) * 60
+                )}{' '}
+                хв
+              </span>
+            </div>
+
+          </div>
+
+          <div className="mt-2 bg-cyan-950/60 p-2 rounded-xl text-xs text-cyan-200 flex items-center justify-between">
+
+            <span>
+              <ChevronRight className="w-4 h-4 inline" />
+              {navSteps[currentStepIndex]}
+            </span>
+
+            <button
+              onClick={() =>
+                setCurrentStepIndex(
+                  index =>
+                    (index + 1) %
+                    navSteps.length
+                )
+              }
+              className="text-[9px] font-extrabold bg-cyan-600 text-slate-950 px-2 py-1 rounded-md"
+            >
+              Далі →
+            </button>
+
+          </div>
 
         </div>
       )}
 
-      /*
-       * КАРТКА ОБ'ЄКТА
-       */
       {selectedListing && (
-        <div className="absolute top-3 right-3 bottom-3 z-30 w-[calc(100%-24px)] sm:w-[380px] md:w-[400px] bg-slate-950/95 border-2 border-purple-600/90 text-slate-100 rounded-3xl p-4 shadow-2xl backdrop-blur-2xl flex flex-col justify-between overflow-y-auto space-y-3">
 
-          <div className="space-y-2">
+        <div className="absolute top-3 right-3 bottom-3 z-50 w-[calc(100%-24px)] sm:w-[380px] bg-slate-950/95 border-2 border-purple-600 text-slate-100 rounded-3xl p-4 shadow-2xl overflow-y-auto">
 
-            <div className="flex items-center justify-between border-b border-purple-900/50 pb-2.5">
+          <div className="flex items-center justify-between border-b border-purple-900/50 pb-3">
 
-              <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="bg-purple-950 text-purple-200 text-xs font-black px-2.5 py-1 rounded-full border border-purple-800/60">
+              {CATEGORIES[
+                selectedListing.category
+              ]?.pinSymbol || '📌'}{' '}
+              {CATEGORIES[
+                selectedListing.category
+              ]?.label || 'Пропозиція'}
+            </span>
 
-                <span className="bg-purple-950 text-purple-200 text-xs font-black px-2.5 py-1 rounded-full border border-purple-800/60 flex items-center gap-1">
+            <button
+              onClick={() =>
+                onSelectListing(null)
+              }
+              className="p-1.5 rounded-full bg-slate-900 text-purple-300"
+            >
+              <X className="w-4 h-4" />
+            </button>
 
-                  <span>
-                    {CATEGORIES[
-                      selectedListing.category
-                    ]?.pinSymbol || '📌'}
-                  </span>
+          </div>
 
-                  <span>
-                    {CATEGORIES[
-                      selectedListing.category
-                    ]?.label ||
-                      'Пропозиція'}
-                  </span>
+          <h4 className="font-extrabold text-base mt-3">
+            {selectedListing.title}
+          </h4>
 
-                </span>
-
-                {selectedListing.isUrgent && (
-                  <span className="bg-rose-600 text-white text-xs font-black px-2 py-0.5 rounded-full animate-pulse">
-                    🚨 Терміново
-                  </span>
-                )}
-
-              </div>
-
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSelectListing(null);
-                }}
-                className="p-1.5 rounded-full bg-slate-900 text-purple-300 border border-purple-800/40"
-              >
-                <X className="w-4 h-4" />
-              </button>
-
-            </div>
-
-            <div className="space-y-1 pt-1">
-
-              <h4 className="font-extrabold text-base text-slate-100 leading-snug">
-                {selectedListing.title}
-              </h4>
-
-              <div className="flex items-center justify-between gap-2 pt-1">
-
-                <span className="text-xs text-purple-300/90 font-bold flex items-center gap-1">
-
-                  <MapPin className="w-3.5 h-3.5 text-cyan-400" />
-
-                  <span>
-                    📍{' '}
-                    {formatDistance(
-                      selectedListing.distanceMeters
-                    )}{' '}
-                    від вас
-                  </span>
-
-                </span>
-
-                <span className="text-xs font-black text-violet-200 bg-purple-950/90 px-3 py-1 rounded-xl border border-purple-800/60">
-                  {selectedListing.pay}
-                </span>
-
-              </div>
-
-            </div>
-
+          <div className="text-xs text-purple-300 mt-2">
+            📍{' '}
+            {formatDistance(
+              selectedListing.distanceMeters
+            )}{' '}
+            від вас
           </div>
 
           {selectedListing.photoUrl && (
-            <div className="rounded-2xl overflow-hidden border border-purple-900/40 h-36 bg-slate-900 shrink-0">
-
+            <div className="rounded-2xl overflow-hidden mt-3 h-36">
               <img
-                src={
-                  selectedListing.photoUrl
-                }
-                alt={
-                  selectedListing.title
-                }
+                src={selectedListing.photoUrl}
+                alt={selectedListing.title}
                 className="w-full h-full object-cover"
               />
-
             </div>
           )}
 
-          <div className="space-y-2 text-xs bg-slate-900/80 p-3 rounded-2xl border border-purple-900/40">
+          <div className="bg-slate-900 p-3 rounded-2xl mt-3 text-xs">
 
-            <div className="text-purple-200/90 font-medium">
-
-              <span className="text-purple-400 font-bold">
-                Адреса:{' '}
-              </span>
-
-              <span>
-                {
-                  selectedListing.locationName
-                }
-              </span>
-
+            <div>
+              <b className="text-purple-400">
+                Адреса:
+              </b>{' '}
+              {selectedListing.locationName}
             </div>
 
-            <div className="flex justify-between text-purple-300/80">
-
-              <span>
-                <b>Коли:</b>{' '}
-                {selectedListing.when}
-              </span>
-
-              <span>
-                <b>Тривалість:</b>{' '}
-                {
-                  selectedListing.duration
-                }
-              </span>
-
+            <div className="mt-2">
+              {selectedListing.description}
             </div>
-
-            <p className="text-slate-300 text-xs line-clamp-3 pt-1 border-t border-purple-900/30 font-normal">
-              {
-                selectedListing.description
-              }
-            </p>
 
           </div>
 
-          <div className="grid grid-cols-1 gap-2 pt-2 border-t border-purple-900/40">
+          <div className="grid grid-cols-2 gap-2 mt-3">
 
-            <div className="grid grid-cols-2 gap-2">
-
-              {onCallListing && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onCallListing(
-                      selectedListing
-                    );
-                  }}
-                  className="py-2.5 px-3 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-black text-xs rounded-xl flex items-center justify-center gap-1.5"
-                >
-
-                  <Phone className="w-4 h-4" />
-
-                  <span>
-                    Дзвінок
-                  </span>
-
-                </button>
-              )}
-
-              {onRouteListing && (
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onRouteListing(
-                      selectedListing
-                    );
-                  }}
-                  className="py-2.5 px-3 bg-slate-900 text-purple-200 font-extrabold text-xs rounded-xl border border-purple-800/50 flex items-center justify-center gap-1.5"
-                >
-
-                  <Navigation className="w-4 h-4 text-purple-400" />
-
-                  <span>
-                    Маршрут
-                  </span>
-
-                </button>
-              )}
-
-            </div>
-
-            {onDetailListing && (
+            {onCallListing && (
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDetailListing(
+                onClick={() =>
+                  onCallListing(
                     selectedListing
-                  );
-                }}
-                className="w-full py-2 px-3 bg-purple-950/80 text-purple-200 font-extrabold text-xs rounded-xl border border-purple-800/60 flex items-center justify-center gap-1.5"
+                  )
+                }
+                className="py-2.5 bg-purple-600 text-white font-black text-xs rounded-xl flex items-center justify-center gap-1"
               >
+                <Phone className="w-4 h-4" />
+                Дзвінок
+              </button>
+            )}
 
-                <span>
-                  Повна інформація та контакти
-                </span>
-
-                <ExternalLink className="w-3.5 h-3.5 text-purple-400" />
-
+            {onRouteListing && (
+              <button
+                onClick={() =>
+                  onRouteListing(
+                    selectedListing
+                  )
+                }
+                className="py-2.5 bg-slate-900 text-purple-200 font-bold text-xs rounded-xl border border-purple-800 flex items-center justify-center gap-1"
+              >
+                <Navigation className="w-4 h-4" />
+                Маршрут
               </button>
             )}
 
           </div>
+
+          {onDetailListing && (
+            <button
+              onClick={() =>
+                onDetailListing(
+                  selectedListing
+                )
+              }
+              className="w-full mt-2 py-2 bg-purple-950 text-purple-200 font-bold text-xs rounded-xl border border-purple-800 flex items-center justify-center gap-1"
+            >
+              Повна інформація
+              <ExternalLink className="w-3.5 h-3.5" />
+            </button>
+          )}
 
         </div>
       )}
