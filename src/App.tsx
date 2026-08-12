@@ -45,102 +45,53 @@ export default function App() {
 
   useEffect(() => subscribeToAuth(setCurrentUser), []);
 
-  // Firestore is the persistent source for user-created listings. Demo listings remain visible.
   useEffect(() => {
-    const unsubscribe = onSnapshot(
-      collection(db, 'listings'),
-      (snapshot) => {
-        const remoteListings = snapshot.docs.map((item) => ({
-          ...(item.data() as Omit<Listing, 'id'>),
-          id: item.id,
-        })) as Listing[];
-        setListings([...INITIAL_LISTINGS, ...remoteListings]);
-      },
-      (error) => {
-        console.error('Не вдалося завантажити оголошення з Firestore:', error);
-        setListings(INITIAL_LISTINGS);
-      },
-    );
+    const unsubscribe = onSnapshot(collection(db, 'listings'), (snapshot) => {
+      const remoteListings = snapshot.docs.map((item) => ({ ...(item.data() as Omit<Listing, 'id'>), id: item.id })) as Listing[];
+      setListings([...INITIAL_LISTINGS, ...remoteListings]);
+    }, (error) => {
+      console.error('Не вдалося завантажити оголошення з Firestore:', error);
+      setListings(INITIAL_LISTINGS);
+    });
     return unsubscribe;
   }, []);
 
-  const processedListings = useMemo(() => listings.map((item) => ({
-    ...item,
-    distanceMeters: calculateDistanceMeters(userCoords[0], userCoords[1], item.coordinates[0], item.coordinates[1]),
-  })), [listings, userCoords]);
-
+  const processedListings = useMemo(() => listings.map((item) => ({ ...item, distanceMeters: calculateDistanceMeters(userCoords[0], userCoords[1], item.coordinates[0], item.coordinates[1]) })), [listings, userCoords]);
   const urgentCount = useMemo(() => processedListings.filter((l) => l.isUrgent).length, [processedListings]);
-
   const filteredListings = useMemo(() => processedListings.filter((item) => {
     if (maxRadiusKm !== null && item.distanceMeters > maxRadiusKm * 1000) return false;
     if (selectedCategory !== 'all' && item.category !== selectedCategory) return false;
     if (selectedSubcategory && item.subcategory !== selectedSubcategory) return false;
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      if (!item.title.toLowerCase().includes(q) && !item.description.toLowerCase().includes(q) && !item.locationName.toLowerCase().includes(q) && !item.pay.toLowerCase().includes(q)) return false;
-    }
+    if (searchQuery.trim()) { const q = searchQuery.toLowerCase(); if (!item.title.toLowerCase().includes(q) && !item.description.toLowerCase().includes(q) && !item.locationName.toLowerCase().includes(q) && !item.pay.toLowerCase().includes(q)) return false; }
     return true;
   }), [processedListings, selectedCategory, selectedSubcategory, searchQuery, maxRadiusKm]);
-
   const sortedSearchResults = useMemo(() => sortListings(filteredListings, 'distance'), [filteredListings]);
 
-  const handleCreateListing = async (newListingData: Omit<Listing, 'id' | 'createdAt' | 'viewsCount' | 'callsCount' | 'distanceMeters'>) => {
-    if (!currentUser) return;
-
+  const handleCreateListing = async (newListingData: Omit<Listing, 'id' | 'createdAt' | 'viewsCount' | 'callsCount' | 'distanceMeters'>): Promise<boolean> => {
+    if (!currentUser) return false;
     const createdAt = new Date().toISOString();
-    const dataToSave = {
-      ...newListingData,
-      authorId: currentUser.uid,
-      createdAt,
-      viewsCount: 1,
-      callsCount: 0,
-    };
-
     try {
-      const created = await addDoc(collection(db, 'listings'), dataToSave);
+      const created = await addDoc(collection(db, 'listings'), { ...newListingData, authorId: currentUser.uid, createdAt, viewsCount: 1, callsCount: 0 });
       const dist = calculateDistanceMeters(userCoords[0], userCoords[1], newListingData.coordinates[0], newListingData.coordinates[1]);
-      const newListing: Listing = {
-        ...newListingData,
-        authorId: currentUser.uid,
-        id: created.id,
-        createdAt,
-        viewsCount: 1,
-        callsCount: 0,
-        distanceMeters: dist,
-      };
-      setSelectedListing(newListing);
+      setSelectedListing({ ...newListingData, authorId: currentUser.uid, id: created.id, createdAt, viewsCount: 1, callsCount: 0, distanceMeters: dist });
       setIsCreateModalOpen(false);
+      return true;
     } catch (error) {
       console.error('Не вдалося опублікувати оголошення:', error);
-      window.alert('Не вдалося опублікувати оголошення. Перевірте вхід в акаунт та Firestore Rules.');
+      return false;
     }
   };
 
   const handleAddComment = (listingId: string, commentData: Omit<import('./types').ListingComment, 'id' | 'createdAt'>) => {
     const newComment: import('./types').ListingComment = { ...commentData, id: `comm-${Date.now()}`, createdAt: 'Тільки-но' };
-    setListings((prev) => prev.map((item) => {
-      if (item.id !== listingId) return item;
-      const updatedListing = { ...item, comments: [newComment, ...(item.comments || [])] };
-      if (detailListing?.id === listingId) setDetailListing(updatedListing);
-      if (selectedListing?.id === listingId) setSelectedListing(updatedListing);
-      return updatedListing;
-    }));
+    setListings((prev) => prev.map((item) => { if (item.id !== listingId) return item; const updatedListing = { ...item, comments: [newComment, ...(item.comments || [])] }; if (detailListing?.id === listingId) setDetailListing(updatedListing); if (selectedListing?.id === listingId) setSelectedListing(updatedListing); return updatedListing; }));
   };
 
   const handleDeleteListing = async (id: string): Promise<boolean> => {
     const target = listings.find((l) => l.id === id);
     if (!target || !currentUser || target.authorId !== currentUser.uid) return false;
-
-    try {
-      await deleteDoc(doc(db, 'listings', id));
-      if (selectedListing?.id === id) setSelectedListing(null);
-      if (detailListing?.id === id) setDetailListing(null);
-      if (activeNavigationListing?.id === id) setActiveNavigationListing(null);
-      return true;
-    } catch (error) {
-      console.error('Не вдалося видалити оголошення:', error);
-      return false;
-    }
+    try { await deleteDoc(doc(db, 'listings', id)); if (selectedListing?.id === id) setSelectedListing(null); if (detailListing?.id === id) setDetailListing(null); if (activeNavigationListing?.id === id) setActiveNavigationListing(null); return true; }
+    catch (error) { console.error('Не вдалося видалити оголошення:', error); return false; }
   };
 
   return (
