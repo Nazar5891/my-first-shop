@@ -24,7 +24,7 @@ header { position:relative; z-index:30; }
 .cosmic-glow-purple { box-shadow:0 0 20px rgba(139,92,246,.35); }
 .cosmic-glow-red { box-shadow:0 0 20px rgba(244,63,94,.5); }
 
-/* Leaflet fixes: tiles must render as real 256px tiles and controls must stay clickable. */
+/* Leaflet fixes */
 .leaflet-container { width:100%; height:100%; min-height:420px; z-index:1; background:#e2e8f0 !important; font-family:inherit; }
 .leaflet-pane, .leaflet-tile, .leaflet-marker-icon, .leaflet-marker-shadow, .leaflet-tile-container { position:absolute; }
 .leaflet-tile { max-width:none !important; max-height:none !important; width:256px !important; height:256px !important; display:block !important; visibility:visible !important; opacity:1 !important; }
@@ -41,6 +41,14 @@ header { position:relative; z-index:30; }
 .leaflet-bar a, .leaflet-bar a:hover { width:40px !important; height:40px !important; line-height:40px !important; }
 .leaflet-popup-content-wrapper { background:#0f111a !important; color:#f8fafc !important; border:1px solid #4c1d95 !important; border-radius:16px !important; padding:4px !important; box-shadow:0 10px 30px rgba(0,0,0,.8) !important; }
 .leaflet-popup-tip { background:#0f111a !important; }
+
+/* GPS is visual only and always sits below listing markers. */
+.leaflet-marker-icon.user-location-marker { z-index:100 !important; pointer-events:none !important; touch-action:none !important; }
+.leaflet-marker-icon.user-location-marker * { pointer-events:none !important; }
+/* Listings are always above the GPS marker and remain touch/click targets. */
+.leaflet-marker-icon.custom-listing-marker { z-index:2000 !important; pointer-events:auto !important; touch-action:manipulation !important; }
+.leaflet-marker-icon.custom-listing-marker * { pointer-events:auto; }
+
 @keyframes urgent-pulse { 0%{box-shadow:0 0 0 0 rgba(244,63,94,.9)} 70%{box-shadow:0 0 0 16px rgba(244,63,94,0)} 100%{box-shadow:0 0 0 0 rgba(244,63,94,0)} }
 .urgent-marker-pulse { animation:urgent-pulse 1.6s infinite; border-radius:9999px; }
 @keyframes flash-glow { 0%,100%{opacity:1;transform:scale(1);filter:drop-shadow(0 0 8px rgba(168,85,246,.8))} 50%{opacity:.85;transform:scale(1.05);filter:drop-shadow(0 0 14px rgba(244,63,94,.9))} }
