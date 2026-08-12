@@ -20,7 +20,9 @@ import { INITIAL_LISTINGS, COMMUNITY_CENTER } from './data/mockListings';
 import { Listing, CategoryId, ActiveTab } from './types';
 import { sortListings, calculateDistanceMeters } from './utils/distance';
 import { subscribeToAuth } from './auth';
+import { db } from './firebase';
 import type { User } from 'firebase/auth';
+import { addDoc, collection, deleteDoc, doc, onSnapshot } from 'firebase/firestore';
 import { Siren, SlidersHorizontal, Plus } from 'lucide-react';
 
 export default function App() {
@@ -43,6 +45,25 @@ export default function App() {
 
   useEffect(() => subscribeToAuth(setCurrentUser), []);
 
+  // Firestore is the persistent source for user-created listings. Demo listings remain visible.
+  useEffect(() => {
+    const unsubscribe = onSnapshot(
+      collection(db, 'listings'),
+      (snapshot) => {
+        const remoteListings = snapshot.docs.map((item) => ({
+          ...(item.data() as Omit<Listing, 'id'>),
+          id: item.id,
+        })) as Listing[];
+        setListings([...INITIAL_LISTINGS, ...remoteListings]);
+      },
+      (error) => {
+        console.error('Не вдалося завантажити оголошення з Firestore:', error);
+        setListings(INITIAL_LISTINGS);
+      },
+    );
+    return unsubscribe;
+  }, []);
+
   const processedListings = useMemo(() => listings.map((item) => ({
     ...item,
     distanceMeters: calculateDistanceMeters(userCoords[0], userCoords[1], item.coordinates[0], item.coordinates[1]),
@@ -63,20 +84,36 @@ export default function App() {
 
   const sortedSearchResults = useMemo(() => sortListings(filteredListings, 'distance'), [filteredListings]);
 
-  const handleCreateListing = (newListingData: Omit<Listing, 'id' | 'createdAt' | 'viewsCount' | 'callsCount' | 'distanceMeters'>) => {
+  const handleCreateListing = async (newListingData: Omit<Listing, 'id' | 'createdAt' | 'viewsCount' | 'callsCount' | 'distanceMeters'>) => {
     if (!currentUser) return;
-    const dist = calculateDistanceMeters(userCoords[0], userCoords[1], newListingData.coordinates[0], newListingData.coordinates[1]);
-    const newListing: Listing = {
+
+    const createdAt = new Date().toISOString();
+    const dataToSave = {
       ...newListingData,
       authorId: currentUser.uid,
-      id: `custom-${Date.now()}`,
-      createdAt: 'Тільки-но',
+      createdAt,
       viewsCount: 1,
       callsCount: 0,
-      distanceMeters: dist,
     };
-    setListings((prev) => [newListing, ...prev]);
-    setSelectedListing(newListing);
+
+    try {
+      const created = await addDoc(collection(db, 'listings'), dataToSave);
+      const dist = calculateDistanceMeters(userCoords[0], userCoords[1], newListingData.coordinates[0], newListingData.coordinates[1]);
+      const newListing: Listing = {
+        ...newListingData,
+        authorId: currentUser.uid,
+        id: created.id,
+        createdAt,
+        viewsCount: 1,
+        callsCount: 0,
+        distanceMeters: dist,
+      };
+      setSelectedListing(newListing);
+      setIsCreateModalOpen(false);
+    } catch (error) {
+      console.error('Не вдалося опублікувати оголошення:', error);
+      window.alert('Не вдалося опублікувати оголошення. Перевірте вхід в акаунт та Firestore Rules.');
+    }
   };
 
   const handleAddComment = (listingId: string, commentData: Omit<import('./types').ListingComment, 'id' | 'createdAt'>) => {
@@ -90,15 +127,20 @@ export default function App() {
     }));
   };
 
-  // Legacy SMS/OTP deletion logic has been removed.
-  const handleDeleteListing = (id: string, _legacyCode: string): boolean => {
+  const handleDeleteListing = async (id: string): Promise<boolean> => {
     const target = listings.find((l) => l.id === id);
     if (!target || !currentUser || target.authorId !== currentUser.uid) return false;
-    setListings((prev) => prev.filter((l) => l.id !== id));
-    if (selectedListing?.id === id) setSelectedListing(null);
-    if (detailListing?.id === id) setDetailListing(null);
-    if (activeNavigationListing?.id === id) setActiveNavigationListing(null);
-    return true;
+
+    try {
+      await deleteDoc(doc(db, 'listings', id));
+      if (selectedListing?.id === id) setSelectedListing(null);
+      if (detailListing?.id === id) setDetailListing(null);
+      if (activeNavigationListing?.id === id) setActiveNavigationListing(null);
+      return true;
+    } catch (error) {
+      console.error('Не вдалося видалити оголошення:', error);
+      return false;
+    }
   };
 
   return (
