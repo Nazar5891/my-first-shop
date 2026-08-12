@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Header } from './components/Header';
 import { MapView } from './components/MapView';
 import { ListingCard } from './components/ListingCard';
@@ -19,6 +19,8 @@ import { DistanceRangeSlider } from './components/DistanceRangeSlider';
 import { INITIAL_LISTINGS, COMMUNITY_CENTER } from './data/mockListings';
 import { Listing, CategoryId, ActiveTab } from './types';
 import { sortListings, calculateDistanceMeters } from './utils/distance';
+import { subscribeToAuth } from './auth';
+import type { User } from 'firebase/auth';
 import { Siren, SlidersHorizontal, Plus } from 'lucide-react';
 
 export default function App() {
@@ -37,15 +39,18 @@ export default function App() {
   const [callingListing, setCallingListing] = useState<Listing | null>(null);
   const [routingListing, setRoutingListing] = useState<Listing | null>(null);
   const [reportingListing, setReportingListing] = useState<Listing | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  const processedListings = useMemo(() => listings.map(item => ({
+  useEffect(() => subscribeToAuth(setCurrentUser), []);
+
+  const processedListings = useMemo(() => listings.map((item) => ({
     ...item,
     distanceMeters: calculateDistanceMeters(userCoords[0], userCoords[1], item.coordinates[0], item.coordinates[1]),
   })), [listings, userCoords]);
 
-  const urgentCount = useMemo(() => processedListings.filter(l => l.isUrgent).length, [processedListings]);
+  const urgentCount = useMemo(() => processedListings.filter((l) => l.isUrgent).length, [processedListings]);
 
-  const filteredListings = useMemo(() => processedListings.filter(item => {
+  const filteredListings = useMemo(() => processedListings.filter((item) => {
     if (maxRadiusKm !== null && item.distanceMeters > maxRadiusKm * 1000) return false;
     if (selectedCategory !== 'all' && item.category !== selectedCategory) return false;
     if (selectedSubcategory && item.subcategory !== selectedSubcategory) return false;
@@ -59,22 +64,24 @@ export default function App() {
   const sortedSearchResults = useMemo(() => sortListings(filteredListings, 'distance'), [filteredListings]);
 
   const handleCreateListing = (newListingData: Omit<Listing, 'id' | 'createdAt' | 'viewsCount' | 'callsCount' | 'distanceMeters'>) => {
+    if (!currentUser) return;
     const dist = calculateDistanceMeters(userCoords[0], userCoords[1], newListingData.coordinates[0], newListingData.coordinates[1]);
     const newListing: Listing = {
       ...newListingData,
+      authorId: currentUser.uid,
       id: `custom-${Date.now()}`,
       createdAt: 'Тільки-но',
       viewsCount: 1,
       callsCount: 0,
       distanceMeters: dist,
     };
-    setListings(prev => [newListing, ...prev]);
+    setListings((prev) => [newListing, ...prev]);
     setSelectedListing(newListing);
   };
 
   const handleAddComment = (listingId: string, commentData: Omit<import('./types').ListingComment, 'id' | 'createdAt'>) => {
     const newComment: import('./types').ListingComment = { ...commentData, id: `comm-${Date.now()}`, createdAt: 'Тільки-но' };
-    setListings(prev => prev.map(item => {
+    setListings((prev) => prev.map((item) => {
       if (item.id !== listingId) return item;
       const updatedListing = { ...item, comments: [newComment, ...(item.comments || [])] };
       if (detailListing?.id === listingId) setDetailListing(updatedListing);
@@ -83,17 +90,11 @@ export default function App() {
     }));
   };
 
-  // Видалення тепер авторизоване акаунтом. SMS/OTP/7788/8899 більше не використовуються.
-  const handleDeleteListing = (id: string, _code: string): boolean => {
-    const target = listings.find(l => l.id === id);
-    if (!target) return false;
-
-    // Ownership must be enforced by the authenticated Firebase user and Firestore Rules.
-    // The UI callback receives no usable deletion code anymore.
-    const currentUserId = localStorage.getItem('firebase_user_uid');
-    if (!currentUserId || target.authorId !== currentUserId) return false;
-
-    setListings(prev => prev.filter(l => l.id !== id));
+  // Legacy SMS/OTP deletion logic has been removed.
+  const handleDeleteListing = (id: string, _legacyCode: string): boolean => {
+    const target = listings.find((l) => l.id === id);
+    if (!target || !currentUser || target.authorId !== currentUser.uid) return false;
+    setListings((prev) => prev.filter((l) => l.id !== id));
     if (selectedListing?.id === id) setSelectedListing(null);
     if (detailListing?.id === id) setDetailListing(null);
     if (activeNavigationListing?.id === id) setActiveNavigationListing(null);
@@ -103,11 +104,20 @@ export default function App() {
   return (
     <div className="h-full min-h-screen flex flex-col bg-[url('https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=2000&auto=format&fit=crop')] bg-cover bg-center bg-fixed text-slate-100 font-sans selection:bg-purple-600 selection:text-white relative">
       <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-[2px] pointer-events-none z-0 cosmic-bg-overlay" />
-      <div className="relative z-10 flex flex-col min-h-screen">
-        <Header searchQuery={searchQuery} onSearchChange={setSearchQuery} />
-        <main className="flex-1 overflow-y-auto">
-          {/* Existing application UI continues below in the current project. */}
+      <div className="relative z-10 h-full min-h-screen flex flex-col">
+        <Header searchQuery={searchQuery} setSearchQuery={setSearchQuery} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} selectedSubcategory={selectedSubcategory} setSelectedSubcategory={setSelectedSubcategory} isNearMeActive={isNearMeActive} setIsNearMeActive={(active) => { setIsNearMeActive(active); if (active) setActiveTab('near'); }} urgentCount={urgentCount} totalListingsCount={processedListings.length} />
+        <main className="flex-1 relative overflow-hidden flex flex-col">
+          {activeTab === 'map' && <div className="relative w-full h-full flex-1 flex flex-col min-h-[calc(100vh-140px)]"><div className="flex-1 w-full h-full"><MapView listings={filteredListings} selectedListing={selectedListing} onSelectListing={setSelectedListing} userCoordinates={userCoords} setUserCoordinates={setUserCoords} activeNavigationListing={activeNavigationListing} onStopNavigation={() => setActiveNavigationListing(null)} onCallListing={setCallingListing} onRouteListing={setRoutingListing} onDetailListing={setDetailListing} maxRadiusKm={maxRadiusKm} onChangeMaxRadiusKm={setMaxRadiusKm} /></div>{urgentCount > 0 && selectedCategory === 'urgent' && <div className="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-rose-950/90 text-rose-200 text-xs font-black px-3.5 py-1.5 rounded-full shadow-lg border border-rose-600/50 flex items-center gap-2 animate-pulse backdrop-blur-md"><Siren className="w-4 h-4 text-rose-400 shrink-0" /><span>{urgentCount} термінових запитів допомоги поруч</span><button onClick={() => setSelectedCategory('all')} className="underline text-[11px] text-rose-300 hover:text-white shrink-0 ml-1">Всі</button></div>}</div>}
+          {activeTab === 'search' && <div className="p-3 sm:p-4 max-w-3xl mx-auto w-full space-y-3 pb-24 overflow-y-auto"><DistanceRangeSlider maxRadiusKm={maxRadiusKm} onChangeMaxRadiusKm={setMaxRadiusKm} filteredCount={sortedSearchResults.length} totalCount={processedListings.length} /><div className="flex items-center justify-between px-1"><div className="text-xs font-extrabold text-purple-300 uppercase tracking-widest flex items-center gap-1.5"><SlidersHorizontal className="w-3.5 h-3.5 text-purple-400" /><span>Знайдено оголошень ({sortedSearchResults.length})</span></div>{selectedCategory !== 'all' && <button onClick={() => setSelectedCategory('all')} className="text-xs font-bold text-violet-400 hover:text-violet-300 underline">Очистити фільтр</button>}</div>{sortedSearchResults.length === 0 ? <div className="cosmic-glass-card rounded-3xl p-8 text-center space-y-3 my-4"><div className="w-12 h-12 bg-purple-950/60 text-purple-300 rounded-full flex items-center justify-center mx-auto text-xl border border-purple-800/40">🌌</div><h3 className="text-base font-bold text-slate-100">Оголошень не знайдено</h3><p className="text-xs text-purple-200/70 max-w-xs mx-auto">Спробуйте змінити пошуковий запит або додайте перше оголошення у громаді!</p><button onClick={() => setIsCreateModalOpen(true)} className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-extrabold text-xs rounded-xl inline-flex items-center gap-1.5"><Plus className="w-4 h-4" /><span>Створити оголошення</span></button></div> : <div className="space-y-3">{sortedSearchResults.map((listing) => <ListingCard key={listing.id} listing={listing} onClick={() => setDetailListing(listing)} onCallClick={() => setCallingListing(listing)} variant="full" />)}</div>}</div>}
+          {activeTab === 'near' && <div className="p-3 sm:p-4 max-w-3xl mx-auto w-full"><NearMeView listings={processedListings} onSelectListing={setDetailListing} onCallListing={setCallingListing} selectedCategory={selectedCategory} maxRadiusKm={maxRadiusKm} onChangeMaxRadiusKm={setMaxRadiusKm} totalListingsCount={processedListings.length} /></div>}
+          {activeTab === 'more' && <div className="p-3 sm:p-4 max-w-3xl mx-auto w-full"><MoreTab myListings={processedListings.filter((l) => l.authorId === currentUser?.uid)} allListings={processedListings} onDeleteListing={handleDeleteListing} onSelectCategoryAndSubcategory={(catId, sub) => { setSelectedCategory(catId); setSelectedSubcategory(sub || null); setActiveTab('search'); }} /></div>}
         </main>
+        <ListingDetailBottomSheet listing={detailListing} onClose={() => setDetailListing(null)} onCall={setCallingListing} onRoute={(listing) => { setRoutingListing(listing); if (listing.category === 'rideshare') { setSelectedListing(listing); setActiveTab('map'); } }} onReport={setReportingListing} onAddComment={handleAddComment} />
+        <CreateListingModal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} onSubmit={handleCreateListing} userCoordinates={userCoords} />
+        <CallModal listing={callingListing} onClose={() => setCallingListing(null)} />
+        <RouteModal listing={routingListing} onClose={() => setRoutingListing(null)} onStartOnlineNavigation={(listing) => { setActiveNavigationListing(listing); setActiveTab('map'); setSelectedListing(listing); }} />
+        <ReportModal listing={reportingListing} onClose={() => setReportingListing(null)} />
+        <BottomNav activeTab={activeTab} setActiveTab={(tab) => { setActiveTab(tab); if (tab !== 'near') setIsNearMeActive(false); }} onOpenCreateModal={() => setIsCreateModalOpen(true)} urgentCount={urgentCount} />
       </div>
     </div>
   );
