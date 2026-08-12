@@ -4,6 +4,7 @@ import {
   getRedirectResult,
   onAuthStateChanged,
   signInWithEmailAndPassword,
+  signInWithPopup,
   signInWithRedirect,
   signOut,
   type User,
@@ -19,8 +20,11 @@ export const register = (email: string, password: string) =>
 export const login = (email: string, password: string) =>
   signInWithEmailAndPassword(auth, email.trim(), password);
 
-// Redirect is more reliable than a popup on mobile browsers/GitHub Pages.
-export const loginWithGoogle = () => signInWithRedirect(auth, googleProvider);
+// Popup works directly on GitHub Pages and avoids redirect-return problems on mobile.
+export const loginWithGoogle = () => signInWithPopup(auth, googleProvider);
+
+// Kept for compatibility with an already-started redirect flow.
+export const loginWithGoogleRedirect = () => signInWithRedirect(auth, googleProvider);
 
 export const finishGoogleRedirect = () => getRedirectResult(auth);
 
