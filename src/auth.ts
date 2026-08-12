@@ -4,7 +4,6 @@ import {
   getRedirectResult,
   onAuthStateChanged,
   signInWithEmailAndPassword,
-  signInWithPopup,
   signInWithRedirect,
   signOut,
   type User,
@@ -20,11 +19,8 @@ export const register = (email: string, password: string) =>
 export const login = (email: string, password: string) =>
   signInWithEmailAndPassword(auth, email.trim(), password);
 
-// Popup works directly on GitHub Pages and avoids redirect-return problems on mobile.
-export const loginWithGoogle = () => signInWithPopup(auth, googleProvider);
-
-// Kept for compatibility with an already-started redirect flow.
-export const loginWithGoogleRedirect = () => signInWithRedirect(auth, googleProvider);
+// Use Firebase redirect flow on GitHub Pages. It avoids popup blockers on Android.
+export const loginWithGoogle = () => signInWithRedirect(auth, googleProvider);
 
 export const finishGoogleRedirect = () => getRedirectResult(auth);
 
