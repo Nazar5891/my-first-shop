@@ -121,11 +121,9 @@ export const MapView: React.FC<MapViewProps> = ({
     );
   };
 
-  // Automatic permission request when the map opens.
   useEffect(() => {
     if (!setUserCoordinates) return;
     requestGPS();
-    // Deliberately once: pressing the button later calls requestGPS again.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -136,8 +134,6 @@ export const MapView: React.FC<MapViewProps> = ({
     userMarkerRef.current = null;
     radiusCircleRef.current?.remove();
     radiusCircleRef.current = null;
-
-    // NEVER use COMMUNITY_CENTER as a fake GPS location.
     if (!gpsEnabled || !realGpsCoordinates) return;
 
     const icon = L.divIcon({
@@ -176,15 +172,11 @@ export const MapView: React.FC<MapViewProps> = ({
     });
   }, [listings, selectedListing, activeNavigationListing]);
 
-  // Real road route via OSRM. No straight-line fallback is drawn.
   useEffect(() => {
     const map = mapInstanceRef.current, group = routeGroupRef.current;
     if (!map || !group) return;
     group.clearLayers();
-    setRouteError(false);
-    setRouteLoading(false);
-    setNavSteps([]);
-    setCurrentStepIndex(0);
+    setRouteError(false); setRouteLoading(false); setNavSteps([]); setCurrentStepIndex(0);
     if (!activeNavigationListing || !gpsEnabled || !realGpsCoordinates) return;
 
     const start = realGpsCoordinates;
@@ -194,7 +186,6 @@ export const MapView: React.FC<MapViewProps> = ({
     const controller = new AbortController();
     setRouteLoading(true);
     const url = `https://router.project-osrm.org/route/v1/driving/${start[1]},${start[0]};${end[1]},${end[0]}?overview=full&geometries=geojson&steps=true`;
-
     fetch(url, { signal: controller.signal })
       .then(r => { if (!r.ok) throw new Error(`OSRM ${r.status}`); return r.json(); })
       .then(data => {
@@ -217,18 +208,14 @@ export const MapView: React.FC<MapViewProps> = ({
       .catch(error => {
         if (error?.name === 'AbortError') return;
         console.error('Не вдалося побудувати маршрут:', error);
-        setRouteError(true);
-        setRouteLoading(false);
+        setRouteError(true); setRouteLoading(false);
       });
-
     return () => controller.abort();
   }, [activeNavigationListing, gpsEnabled, realGpsCoordinates]);
 
   const handleGPSButton = () => {
     if (gpsEnabled) {
-      setGpsEnabled(false);
-      setRealGpsCoordinates(null);
-      return;
+      setGpsEnabled(false); setRealGpsCoordinates(null); return;
     }
     requestGPS();
   };
@@ -242,8 +229,6 @@ export const MapView: React.FC<MapViewProps> = ({
 
   return <div className="relative w-full h-full min-h-[420px] flex-1">
     <div ref={mapContainerRef} className="w-full h-full rounded-2xl overflow-hidden shadow-inner border border-purple-900/30" />
-
-    {isLocating && <div className="absolute top-3 left-1/2 -translate-x-1/2 z-50 bg-slate-950/95 text-cyan-300 border border-cyan-500 rounded-full px-4 py-2 text-xs font-bold shadow-xl">📍 Запитуємо ваше місцезнаходження…</div>}
 
     {isPinSelectMode && <div className="absolute top-3 left-1/2 -translate-x-1/2 z-40 bg-purple-900/95 text-white text-xs font-bold px-4 py-2 rounded-full shadow-lg border border-purple-400/50">📍 Натисніть на карту, щоб вибрати точку</div>}
 
