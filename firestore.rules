@@ -15,5 +15,10 @@ service cloud.firestore {
       allow delete: if request.auth != null
         && resource.data.authorId == request.auth.uid;
     }
+
+    match /users/{userId} {
+      allow read, create, update, delete: if request.auth != null
+        && request.auth.uid == userId;
+    }
   }
 }
