@@ -1,0 +1,157 @@
+@import "tailwindcss";
+
+@layer utilities {
+  .font-sans {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  }
+}
+
+/* Cosmic Gothic Background and Effects */
+.cosmic-bg-overlay {
+  background: radial-gradient(circle at 50% 20%, rgba(124, 58, 237, 0.15), transparent 60%),
+              radial-gradient(circle at 80% 80%, rgba(219, 39, 119, 0.1), transparent 50%),
+              rgba(10, 11, 16, 0.88);
+}
+
+.cosmic-glass-panel {
+  background: rgba(13, 14, 22, 0.78);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.5);
+}
+
+.cosmic-glass-card {
+  background: rgba(18, 19, 31, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+}
+
+.cosmic-glass-card:hover {
+  border-color: rgba(168, 85, 247, 0.45);
+  box-shadow: 0 6px 24px rgba(139, 92, 246, 0.2);
+}
+
+.cosmic-glow-purple {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.35);
+}
+
+.cosmic-glow-red {
+  box-shadow: 0 0 20px rgba(244, 63, 94, 0.5);
+}
+
+/* Custom leaflet map adjustments */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  background: #f1f5f9 !important;
+  font-family: inherit;
+}
+
+.leaflet-control-zoom {
+  border: 1px solid rgba(139, 92, 246, 0.3) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+
+.leaflet-control-zoom a {
+  background-color: #0f111a !important;
+  color: #c084fc !important;
+  border-bottom: 1px solid #1e1b4b !important;
+  width: 36px !important;
+  height: 36px !important;
+  line-height: 36px !important;
+  font-weight: 700 !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background-color: #1e1b4b !important;
+  color: #ffffff !important;
+}
+
+.leaflet-popup-content-wrapper {
+  background: #0f111a !important;
+  color: #f8fafc !important;
+  border: 1px solid #4c1d95 !important;
+  border-radius: 16px !important;
+  padding: 4px !important;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8) !important;
+}
+
+.leaflet-popup-tip {
+  background: #0f111a !important;
+}
+
+/* Custom marker pulse animation for Urgent category */
+@keyframes urgent-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.9);
+  }
+  70% {
+    box-shadow: 0 0 0 16px rgba(244, 63, 94, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(244, 63, 94, 0);
+  }
+}
+
+.urgent-marker-pulse {
+  animation: urgent-pulse 1.6s infinite;
+  border-radius: 9999px;
+}
+
+@keyframes flash-glow {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    filter: drop-shadow(0 0 8px rgba(168, 85, 247, 0.8));
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.05);
+    filter: drop-shadow(0 0 14px rgba(244, 63, 94, 0.9));
+  }
+}
+
+.animate-flash-glow {
+  animation: flash-glow 1.8s ease-in-out infinite;
+}
+
+/* Cosmic starlight shimmer animation */
+@keyframes starlight-twinkle {
+  0%, 100% { opacity: 0.3; transform: scale(0.95); }
+  50% { opacity: 0.9; transform: scale(1.05); }
+}
+
+.animate-starlight {
+  animation: starlight-twinkle 3s ease-in-out infinite;
+}
+
+/* Custom scrollbar for horizontal lists */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* Slide in from right animation for side panels */
+@keyframes slide-in-right {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}

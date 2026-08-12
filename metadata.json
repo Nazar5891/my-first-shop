@@ -1,0 +1,6 @@
+{
+  "name": "Помічник",
+  "description": "Цифрова карта та дошка оголошень громади: підробіток, робота, послуги, техніка та допомога поруч з вами.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
