@@ -1,9 +1,10 @@
 import {
   GoogleAuthProvider,
   createUserWithEmailAndPassword,
+  getRedirectResult,
   onAuthStateChanged,
   signInWithEmailAndPassword,
-  signInWithPopup,
+  signInWithRedirect,
   signOut,
   type User,
 } from 'firebase/auth';
@@ -18,7 +19,10 @@ export const register = (email: string, password: string) =>
 export const login = (email: string, password: string) =>
   signInWithEmailAndPassword(auth, email.trim(), password);
 
-export const loginWithGoogle = () => signInWithPopup(auth, googleProvider);
+// Redirect is more reliable than a popup on mobile browsers/GitHub Pages.
+export const loginWithGoogle = () => signInWithRedirect(auth, googleProvider);
+
+export const finishGoogleRedirect = () => getRedirectResult(auth);
 
 export const logout = () => signOut(auth);
 
