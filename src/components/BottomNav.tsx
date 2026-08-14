@@ -1,37 +1,29 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Map, Search, Plus, Menu } from 'lucide-react';
 import { ActiveTab } from '../types';
 
-interface BottomNavProps {
-  activeTab: ActiveTab;
-  setActiveTab: (tab: ActiveTab) => void;
-  onOpenCreateModal: () => void;
-  urgentCount?: number;
-}
+interface BottomNavProps { activeTab: ActiveTab; setActiveTab: (tab: ActiveTab) => void; onOpenCreateModal: () => void; urgentCount?: number; }
 
-export const BottomNav: React.FC<BottomNavProps> = ({
-  activeTab,
-  setActiveTab,
-  onOpenCreateModal,
-  urgentCount = 0,
-}) => {
-  return (
-    <div className="relative w-full shrink-0 z-40 p-3 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent pointer-events-none">
-      <div className="max-w-md mx-auto bg-slate-950/90 backdrop-blur-2xl border border-purple-900/50 rounded-3xl shadow-2xl p-1.5 flex items-center justify-around pointer-events-auto ring-1 ring-purple-500/20">
-        <button onClick={() => setActiveTab('map')} className={`flex-1 py-2 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 ${activeTab === 'map' ? 'text-violet-300 font-black bg-purple-950/80 border border-purple-800/50 shadow-sm' : 'text-purple-300/70 hover:text-white font-semibold'}`}>
-          <Map className="w-5 h-5" /><span className="text-[11px] leading-none">Карта</span>
-        </button>
-        <button onClick={() => setActiveTab('search')} className={`flex-1 py-2 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 relative ${activeTab === 'search' || activeTab === 'near' ? 'text-violet-300 font-black bg-purple-950/80 border border-purple-800/50 shadow-sm' : 'text-purple-300/70 hover:text-white font-semibold'}`}>
-          <Search className="w-5 h-5" /><span className="text-[11px] leading-none">Знайти</span>
-          {urgentCount > 0 && <span className="absolute top-1 right-3 w-2 h-2 rounded-full bg-rose-500 animate-ping" />}
-        </button>
-        <button onClick={onOpenCreateModal} className="mx-1 w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-violet-500 text-white flex items-center justify-center shadow-lg shadow-purple-950/80 hover:scale-105 active:scale-95 transition-all ring-4 ring-slate-950 border border-purple-400/40" title="Додати оголошення">
-          <Plus className="w-6 h-6 stroke-[3]" />
-        </button>
-        <button onClick={() => setActiveTab('more')} className={`flex-1 py-2 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 ${activeTab === 'more' ? 'text-violet-300 font-black bg-purple-950/80 border border-purple-800/50 shadow-sm' : 'text-purple-300/70 hover:text-white font-semibold'}`}>
-          <Menu className="w-5 h-5" /><span className="text-[11px] leading-none">Ще</span>
-        </button>
-      </div>
+export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab, onOpenCreateModal, urgentCount = 0 }) => {
+  useEffect(() => {
+    if (!window.history.state?.meisterOnlineNav) window.history.replaceState({ meisterOnlineNav: true, tab: activeTab }, '', window.location.href);
+    const onPopState = (event: PopStateEvent) => setActiveTab(event.state?.meisterOnlineNav ? (event.state.tab as ActiveTab) || 'map' : 'map');
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, [setActiveTab, activeTab]);
+
+  const navigate = (tab: ActiveTab) => {
+    setActiveTab(tab);
+    window.history.pushState({ meisterOnlineNav: true, tab }, '', window.location.href);
+    if (tab === 'search') window.dispatchEvent(new Event('meister-focus-search'));
+  };
+
+  return <div className="relative w-full shrink-0 z-40 p-3 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent pointer-events-none">
+    <div className="max-w-md mx-auto bg-slate-950/90 backdrop-blur-2xl border border-purple-900/50 rounded-3xl shadow-2xl p-1.5 flex items-center justify-around pointer-events-auto ring-1 ring-purple-500/20">
+      <button onClick={() => navigate('map')} className={`flex-1 py-2 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 ${activeTab === 'map' ? 'text-violet-300 font-black bg-purple-950/80 border border-purple-800/50 shadow-sm' : 'text-purple-300/70 hover:text-white font-semibold'}`}><Map className="w-5 h-5" /><span className="text-[11px] leading-none">Карта</span></button>
+      <button onClick={() => navigate('search')} className={`flex-1 py-2 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 relative ${activeTab === 'search' || activeTab === 'near' ? 'text-violet-300 font-black bg-purple-950/80 border border-purple-800/50 shadow-sm' : 'text-purple-300/70 hover:text-white font-semibold'}`}><Search className="w-5 h-5" /><span className="text-[11px] leading-none">Знайти</span>{urgentCount > 0 && <span className="absolute top-1 right-3 w-2 h-2 rounded-full bg-rose-500 animate-ping" />}</button>
+      <button onClick={onOpenCreateModal} className="mx-1 w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-violet-500 text-white flex items-center justify-center shadow-lg shadow-purple-950/80 hover:scale-105 active:scale-95 transition-all ring-4 ring-slate-950 border border-purple-400/40" title="Додати оголошення"><Plus className="w-6 h-6 stroke-[3]" /></button>
+      <button onClick={() => navigate('more')} className={`flex-1 py-2 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 ${activeTab === 'more' ? 'text-violet-300 font-black bg-purple-950/80 border border-purple-800/50 shadow-sm' : 'text-purple-300/70 hover:text-white font-semibold'}`}><Menu className="w-5 h-5" /><span className="text-[11px] leading-none">Ще</span></button>
     </div>
-  );
+  </div>;
 };
