@@ -2,14 +2,17 @@ import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Check, LocateFixed, X } from 'lucide-react';
-import { COMMUNITY_CENTER } from '../data/mockListings';
 
 interface ListingMapPickerProps {
   isOpen: boolean;
   initialCoordinates?: [number, number] | null;
-  onConfirm: (coordinates: [number, number]) => void;
+  onConfirm: (coordinates: [number, number], locationName?: string) => void;
   onClose: () => void;
 }
+
+// Do not use Rokytne as a default location. If the user has not selected/GPS-located a point,
+// show a neutral Ukraine view and ask them to choose their actual location.
+const UKRAINE_VIEW: [number, number] = [49.0, 31.5];
 
 export const ListingMapPicker: React.FC<ListingMapPickerProps> = ({ isOpen, initialCoordinates, onConfirm, onClose }) => {
   const elementRef = useRef<HTMLDivElement | null>(null);
@@ -17,6 +20,7 @@ export const ListingMapPicker: React.FC<ListingMapPickerProps> = ({ isOpen, init
   const markerRef = useRef<L.Marker | null>(null);
   const [selected, setSelected] = useState<[number, number] | null>(initialCoordinates ?? null);
   const [gpsBusy, setGpsBusy] = useState(false);
+  const [addressBusy, setAddressBusy] = useState(false);
 
   useEffect(() => {
     if (isOpen) setSelected(initialCoordinates ?? null);
@@ -24,7 +28,6 @@ export const ListingMapPicker: React.FC<ListingMapPickerProps> = ({ isOpen, init
 
   useEffect(() => {
     if (!isOpen) return;
-
     let cancelled = false;
     let retry: ReturnType<typeof setTimeout> | null = null;
 
@@ -52,8 +55,8 @@ export const ListingMapPicker: React.FC<ListingMapPickerProps> = ({ isOpen, init
       }
 
       const map = L.map(el, {
-        center: initialCoordinates ?? COMMUNITY_CENTER,
-        zoom: 14,
+        center: initialCoordinates ?? UKRAINE_VIEW,
+        zoom: initialCoordinates ? 16 : 6,
         zoomControl: true,
         attributionControl: true,
         tap: true,
@@ -64,10 +67,8 @@ export const ListingMapPicker: React.FC<ListingMapPickerProps> = ({ isOpen, init
         maxZoom: 19,
         attribution: '&copy; OpenStreetMap contributors',
       }).addTo(map);
-
       tiles.on('tileerror', () => console.warn('OSM tile failed'));
       map.on('click', e => putMarker([e.latlng.lat, e.latlng.lng]));
-
       if (initialCoordinates) putMarker(initialCoordinates);
 
       const resize = () => {
@@ -100,7 +101,7 @@ export const ListingMapPicker: React.FC<ListingMapPickerProps> = ({ isOpen, init
         const point: [number, number] = [coords.latitude, coords.longitude];
         setGpsBusy(false);
         setSelected(point);
-        mapRef.current?.setView(point, 16, { animate: true });
+        mapRef.current?.setView(point, 17, { animate: true });
         if (mapRef.current) {
           const icon = L.divIcon({ className: 'listing-location-pin', html: '<div style="font-size:38px;line-height:38px">📍</div>', iconSize: [38, 38], iconAnchor: [19, 36] });
           if (!markerRef.current) markerRef.current = L.marker(point, { icon }).addTo(mapRef.current);
@@ -110,6 +111,31 @@ export const ListingMapPicker: React.FC<ListingMapPickerProps> = ({ isOpen, init
       () => setGpsBusy(false),
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
     );
+  };
+
+  const confirm = async () => {
+    if (!selected) return;
+    setAddressBusy(true);
+    let locationName: string | undefined;
+    try {
+      const [lat, lon] = selected;
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&zoom=18&addressdetails=1`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const a = data?.address ?? {};
+        const street = a.road || a.pedestrian || a.footway;
+        const house = a.house_number;
+        const locality = a.city || a.town || a.village || a.municipality || a.county;
+        locationName = [street && `${street}${house ? ` ${house}` : ''}`, locality].filter(Boolean).join(', ') || undefined;
+      }
+    } catch (error) {
+      console.warn('Reverse geocoding failed', error);
+    } finally {
+      setAddressBusy(false);
+    }
+    onConfirm(selected, locationName);
   };
 
   if (!isOpen) return null;
@@ -123,7 +149,7 @@ export const ListingMapPicker: React.FC<ListingMapPickerProps> = ({ isOpen, init
       <div ref={elementRef} className="listing-map-picker flex-1 min-h-0 w-full" />
       <div className="listing-map-footer shrink-0 p-3 bg-slate-950 border-t border-purple-900/50 flex gap-2">
         <button type="button" onClick={locate} disabled={gpsBusy} className="flex-1 py-3 rounded-2xl bg-emerald-600 text-white font-black flex items-center justify-center gap-2 disabled:opacity-60"><LocateFixed className="w-4 h-4"/>{gpsBusy ? 'Визначаю...' : 'Моє місце'}</button>
-        <button type="button" onClick={() => selected && onConfirm(selected)} disabled={!selected} className="flex-1 py-3 rounded-2xl bg-cyan-600 text-white font-black flex items-center justify-center gap-2 disabled:opacity-40"><Check className="w-4 h-4"/>Готово</button>
+        <button type="button" onClick={confirm} disabled={!selected || addressBusy} className="flex-1 py-3 rounded-2xl bg-cyan-600 text-white font-black flex items-center justify-center gap-2 disabled:opacity-40"><Check className="w-4 h-4"/>{addressBusy ? 'Визначаю адресу...' : 'Готово'}</button>
       </div>
     </div>
   );
