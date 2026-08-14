@@ -18,9 +18,8 @@ export const DistanceRangeSlider: React.FC<DistanceRangeSliderProps> = ({
   totalCount,
   compact = false,
 }) => {
-  // Find index corresponding to maxRadiusKm
   const currentIndex = RADIUS_STEPS.findIndex((step) => step === maxRadiusKm);
-  const safeIndex = currentIndex !== -1 ? currentIndex : 4; // default to 'All' if unmatched
+  const safeIndex = currentIndex !== -1 ? currentIndex : 4;
 
   const handleSliderChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const idx = parseInt(e.target.value, 10);
@@ -33,11 +32,11 @@ export const DistanceRangeSlider: React.FC<DistanceRangeSliderProps> = ({
     return `${step} км`;
   };
 
-  const currentLabel = maxRadiusKm === null ? 'Вся громада (без обмежень)' : `до ${maxRadiusKm} км`;
+  // Не показуємо напис «Вся громада (без обмежень)».
+  const currentLabel = maxRadiusKm === null ? 'Всі' : `до ${maxRadiusKm} км`;
 
   return (
     <div className={`bg-slate-900/90 backdrop-blur-md rounded-2xl border border-purple-900/50 p-3.5 shadow-xl space-y-3 transition-all ${compact ? 'py-2.5 px-3' : ''}`}>
-      {/* Header Info */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2">
           <div className="w-7 h-7 rounded-lg bg-purple-950 text-purple-300 border border-purple-800/60 flex items-center justify-center shrink-0">
@@ -70,7 +69,6 @@ export const DistanceRangeSlider: React.FC<DistanceRangeSliderProps> = ({
         )}
       </div>
 
-      {/* Range Slider Control */}
       <div className="space-y-1.5 px-1">
         <div className="relative flex items-center">
           <input
@@ -85,7 +83,6 @@ export const DistanceRangeSlider: React.FC<DistanceRangeSliderProps> = ({
           />
         </div>
 
-        {/* Step Ticks Below Slider */}
         <div className="flex justify-between items-center text-[11px] font-extrabold text-purple-300/70 pt-0.5">
           {RADIUS_STEPS.map((step, idx) => {
             const isActive = safeIndex === idx;
@@ -104,7 +101,6 @@ export const DistanceRangeSlider: React.FC<DistanceRangeSliderProps> = ({
         </div>
       </div>
 
-      {/* Preset Quick Buttons */}
       <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pt-1">
         {RADIUS_STEPS.map((step, idx) => {
           const isSelected = safeIndex === idx;
