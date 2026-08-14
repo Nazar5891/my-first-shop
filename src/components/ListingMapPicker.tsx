@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import { Check, LocateFixed, X } from 'lucide-react';
+import { Check, LocateFixed, Search, X } from 'lucide-react';
 
 interface ListingMapPickerProps {
   isOpen: boolean;
@@ -10,9 +10,9 @@ interface ListingMapPickerProps {
   onClose: () => void;
 }
 
-// Neutral starting view: show the whole Rivne region, not Rokytne.
-const RIVNE_REGION_VIEW: [number, number] = [50.6, 26.3];
-const RIVNE_REGION_ZOOM = 8;
+// Карта не обмежена Рокитним: можна вибрати будь-яке місце в Україні та за її межами.
+const UKRAINE_VIEW: [number, number] = [49.0, 31.5];
+const UKRAINE_ZOOM = 6;
 
 export const ListingMapPicker: React.FC<ListingMapPickerProps> = ({ isOpen, initialCoordinates, onConfirm, onClose }) => {
   const elementRef = useRef<HTMLDivElement | null>(null);
@@ -21,9 +21,16 @@ export const ListingMapPicker: React.FC<ListingMapPickerProps> = ({ isOpen, init
   const [selected, setSelected] = useState<[number, number] | null>(initialCoordinates ?? null);
   const [gpsBusy, setGpsBusy] = useState(false);
   const [addressBusy, setAddressBusy] = useState(false);
+  const [searchBusy, setSearchBusy] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchError, setSearchError] = useState('');
 
   useEffect(() => {
-    if (isOpen) setSelected(initialCoordinates ?? null);
+    if (isOpen) {
+      setSelected(initialCoordinates ?? null);
+      setSearchQuery('');
+      setSearchError('');
+    }
   }, [isOpen, initialCoordinates]);
 
   useEffect(() => {
@@ -38,12 +45,13 @@ export const ListingMapPicker: React.FC<ListingMapPickerProps> = ({ isOpen, init
       iconAnchor: [19, 36],
     });
 
-    const putMarker = (coords: [number, number]) => {
+    const putMarker = (coords: [number, number], zoom?: number) => {
       setSelected(coords);
       const map = mapRef.current;
       if (!map) return;
       if (!markerRef.current) markerRef.current = L.marker(coords, { icon }).addTo(map);
       else markerRef.current.setLatLng(coords);
+      if (zoom) map.setView(coords, zoom, { animate: true });
     };
 
     const init = () => {
@@ -55,8 +63,8 @@ export const ListingMapPicker: React.FC<ListingMapPickerProps> = ({ isOpen, init
       }
 
       const map = L.map(el, {
-        center: initialCoordinates ?? RIVNE_REGION_VIEW,
-        zoom: initialCoordinates ? 16 : RIVNE_REGION_ZOOM,
+        center: initialCoordinates ?? UKRAINE_VIEW,
+        zoom: initialCoordinates ? 16 : UKRAINE_ZOOM,
         zoomControl: true,
         attributionControl: true,
         tap: true,
@@ -100,6 +108,7 @@ export const ListingMapPicker: React.FC<ListingMapPickerProps> = ({ isOpen, init
       ({ coords }) => {
         const point: [number, number] = [coords.latitude, coords.longitude];
         setGpsBusy(false);
+        setSearchError('');
         setSelected(point);
         mapRef.current?.setView(point, 17, { animate: true });
         if (mapRef.current) {
@@ -111,6 +120,39 @@ export const ListingMapPicker: React.FC<ListingMapPickerProps> = ({ isOpen, init
       () => setGpsBusy(false),
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
     );
+  };
+
+  const searchPlace = async () => {
+    const query = searchQuery.trim();
+    if (!query) return;
+    setSearchBusy(true);
+    setSearchError('');
+    try {
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&q=${encodeURIComponent(query)}`, {
+        headers: { Accept: 'application/json' },
+      });
+      if (!response.ok) throw new Error('Search failed');
+      const results = await response.json();
+      const result = results?.[0];
+      if (!result) {
+        setSearchError('Місто або адресу не знайдено. Спробуйте написати інакше.');
+        return;
+      }
+      const point: [number, number] = [Number(result.lat), Number(result.lon)];
+      const map = mapRef.current;
+      if (map) {
+        const icon = L.divIcon({ className: 'listing-location-pin', html: '<div style="font-size:38px;line-height:38px">📍</div>', iconSize: [38, 38], iconAnchor: [19, 36] });
+        if (!markerRef.current) markerRef.current = L.marker(point, { icon }).addTo(map);
+        else markerRef.current.setLatLng(point);
+        map.setView(point, 16, { animate: true });
+      }
+      setSelected(point);
+    } catch (error) {
+      console.warn('Place search failed', error);
+      setSearchError('Не вдалося знайти місце. Перевірте інтернет-зʼєднання.');
+    } finally {
+      setSearchBusy(false);
+    }
   };
 
   const confirm = async () => {
@@ -128,7 +170,7 @@ export const ListingMapPicker: React.FC<ListingMapPickerProps> = ({ isOpen, init
         const street = a.road || a.pedestrian || a.footway;
         const house = a.house_number;
         const locality = a.city || a.town || a.village || a.municipality || a.county;
-        locationName = [street && `${street}${house ? ` ${house}` : ''}`, locality].filter(Boolean).join(', ') || undefined;
+        locationName = [street && `${street}${house ? ` ${house}` : ''}`, locality].filter(Boolean).join(', ') || data?.display_name || undefined;
       }
     } catch (error) {
       console.warn('Reverse geocoding failed', error);
@@ -142,9 +184,16 @@ export const ListingMapPicker: React.FC<ListingMapPickerProps> = ({ isOpen, init
 
   return (
     <div className="listing-map-overlay fixed inset-0 z-[9999] bg-slate-950 flex flex-col">
-      <div className="listing-map-header shrink-0 h-16 px-4 flex items-center justify-between bg-slate-950 border-b border-purple-900/50">
-        <div><div className="font-black text-white">Виберіть місце</div><div className="text-xs text-purple-300">Натисніть на карту, щоб поставити 📍</div></div>
-        <button type="button" onClick={onClose} className="w-10 h-10 rounded-full bg-slate-900 border border-purple-800 text-white flex items-center justify-center"><X /></button>
+      <div className="listing-map-header shrink-0 bg-slate-950 border-b border-purple-900/50 p-3 space-y-2">
+        <div className="flex items-center justify-between gap-3">
+          <div><div className="font-black text-white">Виберіть місце</div><div className="text-xs text-purple-300">Рівне, Рокитне або будь-яке інше місто</div></div>
+          <button type="button" onClick={onClose} className="w-10 h-10 shrink-0 rounded-full bg-slate-900 border border-purple-800 text-white flex items-center justify-center"><X /></button>
+        </div>
+        <div className="flex gap-2">
+          <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') searchPlace(); }} placeholder="Знайти місто або адресу, напр. Рівне" className="min-w-0 flex-1 px-3 py-2.5 rounded-xl bg-slate-900 border border-purple-800/60 text-white text-sm outline-none focus:border-cyan-500" />
+          <button type="button" onClick={searchPlace} disabled={searchBusy || !searchQuery.trim()} className="px-3 rounded-xl bg-purple-600 text-white font-black disabled:opacity-50 flex items-center gap-1.5"><Search className="w-4 h-4" />{searchBusy ? '...' : 'Знайти'}</button>
+        </div>
+        {searchError && <div className="text-[11px] font-bold text-rose-300 px-1">{searchError}</div>}
       </div>
       <div ref={elementRef} className="listing-map-picker flex-1 min-h-0 w-full" />
       <div className="listing-map-footer shrink-0 p-3 bg-slate-950 border-t border-purple-900/50 flex gap-2">
