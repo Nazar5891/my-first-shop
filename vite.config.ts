@@ -5,9 +5,8 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
-    // Keep the project-page URL working while allowing the same app to be
-    // deployed as a GitHub user site at the domain root.
-    base: process.env.GITHUB_PAGES_BASE || '/my-first-shop/',
+    // This repository is the GitHub user site, so assets must resolve from the domain root.
+    base: '/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
