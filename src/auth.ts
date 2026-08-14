@@ -4,6 +4,7 @@ import {
   createUserWithEmailAndPassword,
   onAuthStateChanged,
   setPersistence,
+  signInAnonymously,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
@@ -23,6 +24,12 @@ export const login = (email: string, password: string) =>
 export const loginWithGoogle = async () => {
   await setPersistence(auth, browserLocalPersistence);
   return signInWithPopup(auth, googleProvider);
+};
+
+// Anonymous access: visitors can use the site and publish listings without registering.
+export const loginAnonymously = async () => {
+  await setPersistence(auth, browserLocalPersistence);
+  return signInAnonymously(auth);
 };
 
 export const finishGoogleRedirect = async () => null;
