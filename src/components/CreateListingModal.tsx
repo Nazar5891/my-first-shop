@@ -59,9 +59,6 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, 
     }
   };
 
-  // The map picker is deliberately rendered as a separate full-screen layer.
-  // This avoids Leaflet being initialized inside the modal's scrolling/animated
-  // container, which was causing the map canvas to have zero/incorrect size.
   useEffect(() => {
     if (!isOpen || !manualMode) return;
 
@@ -89,10 +86,24 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, 
         });
         mapRef.current = map;
 
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        // Use the same tile provider as the working main site map.
+        const primary = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
           maxZoom: 19,
-          attribution: '&copy; OpenStreetMap contributors'
+          attribution: '&copy; OpenStreetMap &copy; CARTO'
         }).addTo(map);
+
+        // If the primary tile host is unavailable, automatically add a stable OSM fallback.
+        let fallbackAdded = false;
+        const addFallback = () => {
+          if (fallbackAdded || cancelled) return;
+          fallbackAdded = true;
+          L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap contributors'
+          }).addTo(map);
+        };
+        primary.on('tileerror', addFallback);
+        setTimeout(addFallback, 5000);
 
         map.on('click', (event: L.LeafletMouseEvent) => {
           setMapMarker([event.latlng.lat, event.latlng.lng], map);
@@ -103,7 +114,6 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, 
           setMapMarker(coordinates, map);
         }
 
-        // Force Leaflet to recalculate after the overlay is painted.
         requestAnimationFrame(() => map.invalidateSize({ animate: false }));
         setTimeout(() => map.invalidateSize({ animate: false }), 100);
         setTimeout(() => map.invalidateSize({ animate: false }), 400);
@@ -114,8 +124,7 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, 
     };
 
     const frame1 = requestAnimationFrame(() => {
-      const frame2 = requestAnimationFrame(initMap);
-      return frame2;
+      requestAnimationFrame(initMap);
     });
 
     return () => {
