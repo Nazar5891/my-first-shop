@@ -37,7 +37,6 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, 
   const mapElementRef = useRef<HTMLDivElement | null>(null);
   const markerRef = useRef<L.Marker | null>(null);
 
-  if (!isOpen) return null;
   const isUrgent = category === 'urgent';
   const currentCategory = CATEGORIES[category];
   const hasRealGps = !isCommunityCenter(userCoordinates);
@@ -62,6 +61,8 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, 
       markerRef.current = null;
     };
   }, [isOpen, manualMode]);
+
+  if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
