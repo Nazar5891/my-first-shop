@@ -26,7 +26,7 @@ export const loginWithGoogle = async () => {
   return signInWithPopup(auth, googleProvider);
 };
 
-// Anonymous access: visitors can use the site and publish listings without registering.
+// Гостьовий режим: користувач може зайти на сайт без реєстрації.
 export const loginAnonymously = async () => {
   await setPersistence(auth, browserLocalPersistence);
   return signInAnonymously(auth);
@@ -36,5 +36,19 @@ export const finishGoogleRedirect = async () => null;
 
 export const logout = () => signOut(auth);
 
-export const subscribeToAuth = (callback: (user: User | null) => void) =>
-  onAuthStateChanged(auth, callback);
+export const subscribeToAuth = (callback: (user: User | null) => void) => {
+  const unsubscribe = onAuthStateChanged(auth, async user => {
+    if (user) {
+      callback(user);
+      return;
+    }
+    try {
+      const result = await loginAnonymously();
+      callback(result.user);
+    } catch (error) {
+      console.error('Не вдалося увімкнути гостьовий режим:', error);
+      callback(null);
+    }
+  });
+  return unsubscribe;
+};
