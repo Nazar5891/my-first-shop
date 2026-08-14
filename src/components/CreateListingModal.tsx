@@ -49,44 +49,78 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, 
       markerRef.current.setLatLng(coords);
     } else {
       markerRef.current = L.marker(coords, {
-        icon: L.divIcon({ className: 'listing-location-pin', html: '<div style="font-size:34px;line-height:34px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.7))">📍</div>', iconSize: [34, 34], iconAnchor: [17, 32] })
+        icon: L.divIcon({
+          className: 'listing-location-pin',
+          html: '<div style="font-size:34px;line-height:34px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.7))">📍</div>',
+          iconSize: [34, 34],
+          iconAnchor: [17, 32]
+        })
       }).addTo(map);
     }
   };
 
+  // The map picker is deliberately rendered as a separate full-screen layer.
+  // This avoids Leaflet being initialized inside the modal's scrolling/animated
+  // container, which was causing the map canvas to have zero/incorrect size.
   useEffect(() => {
     if (!isOpen || !manualMode) return;
+
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     const initMap = () => {
       const el = mapElementRef.current;
       if (cancelled || !el || mapRef.current) return;
-      if (el.clientWidth < 20 || el.clientHeight < 20) {
+
+      const width = el.getBoundingClientRect().width;
+      const height = el.getBoundingClientRect().height;
+      if (width < 50 || height < 50) {
         timer = setTimeout(initMap, 100);
         return;
       }
 
-      const map = L.map(el, { center: COMMUNITY_CENTER, zoom: 14, zoomControl: true, attributionControl: true });
-      mapRef.current = map;
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 19,
-        attribution: '&copy; OpenStreetMap contributors'
-      }).addTo(map);
+      try {
+        const map = L.map(el, {
+          center: COMMUNITY_CENTER,
+          zoom: 14,
+          zoomControl: true,
+          attributionControl: true,
+          tap: true
+        });
+        mapRef.current = map;
 
-      map.on('click', (event: L.LeafletMouseEvent) => {
-        setMapMarker([event.latlng.lat, event.latlng.lng], map);
-      });
+        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19,
+          attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
 
-      requestAnimationFrame(() => map.invalidateSize(false));
-      setTimeout(() => map.invalidateSize(false), 150);
-      setTimeout(() => map.invalidateSize(false), 500);
+        map.on('click', (event: L.LeafletMouseEvent) => {
+          setMapMarker([event.latlng.lat, event.latlng.lng], map);
+        });
+
+        if (coordinates) {
+          map.setView(coordinates, 16, { animate: false });
+          setMapMarker(coordinates, map);
+        }
+
+        // Force Leaflet to recalculate after the overlay is painted.
+        requestAnimationFrame(() => map.invalidateSize({ animate: false }));
+        setTimeout(() => map.invalidateSize({ animate: false }), 100);
+        setTimeout(() => map.invalidateSize({ animate: false }), 400);
+      } catch (error) {
+        console.error('Listing map initialization failed:', error);
+        setErrorMessage('Не вдалося завантажити карту. Спробуйте ще раз.');
+      }
     };
 
-    const frame = requestAnimationFrame(() => requestAnimationFrame(initMap));
+    const frame1 = requestAnimationFrame(() => {
+      const frame2 = requestAnimationFrame(initMap);
+      return frame2;
+    });
+
     return () => {
       cancelled = true;
-      cancelAnimationFrame(frame);
+      cancelAnimationFrame(frame1);
       if (timer) clearTimeout(timer);
       if (mapRef.current) {
         mapRef.current.off();
@@ -111,6 +145,7 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, 
       setErrorMessage('Цей браузер не підтримує визначення місцезнаходження.');
       return;
     }
+
     setLocating(true);
     setErrorMessage('');
     navigator.geolocation.getCurrentPosition(
@@ -119,20 +154,23 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, 
         setCoordinates(coords);
         setLocating(false);
         setManualMode(true);
-        setTimeout(() => {
-          if (mapRef.current) {
-            mapRef.current.setView(coords, 16, { animate: true });
-            if (markerRef.current) markerRef.current.setLatLng(coords);
-            else setMapMarker(coords, mapRef.current);
-          }
-        }, 150);
       },
       error => {
         setLocating(false);
-        setErrorMessage(error.code === 1 ? 'Дозвольте браузеру доступ до геолокації та натисніть кнопку ще раз.' : 'Не вдалося визначити місцезнаходження. Перевірте GPS.');
+        setErrorMessage(error.code === 1
+          ? 'Дозвольте браузеру доступ до геолокації та натисніть кнопку ще раз.'
+          : 'Не вдалося визначити місцезнаходження. Перевірте GPS.');
       },
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
     );
+  };
+
+  const closeMapPicker = () => {
+    if (!coordinates) {
+      setErrorMessage('📍 Спочатку натисніть на карту та виберіть точку.');
+      return;
+    }
+    setManualMode(false);
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -182,52 +220,65 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
-      <div className="relative w-full max-w-xl bg-slate-950/95 text-slate-100 rounded-3xl shadow-2xl border border-purple-900/50 overflow-hidden my-auto max-h-[92vh] flex flex-col">
-        <div className="p-4 border-b border-purple-900/40 flex items-center justify-between">
-          <div><h2 className="text-lg font-black">Додати оголошення</h2><p className="text-[11px] text-purple-300/70">Публікація доступна авторизованим користувачам</p></div>
-          <button type="button" onClick={onClose} className="w-9 h-9 rounded-full bg-slate-900 text-purple-300 border border-purple-800/40 flex items-center justify-center"><X className="w-5 h-5"/></button>
-        </div>
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-950/80 backdrop-blur-md overflow-y-auto">
+        <div className="relative w-full max-w-xl bg-slate-950/95 text-slate-100 rounded-3xl shadow-2xl border border-purple-900/50 overflow-hidden my-auto max-h-[92vh] flex flex-col">
+          <div className="p-4 border-b border-purple-900/40 flex items-center justify-between">
+            <div><h2 className="text-lg font-black">Додати оголошення</h2><p className="text-[11px] text-purple-300/70">Публікація доступна авторизованим користувачам</p></div>
+            <button type="button" onClick={onClose} className="w-9 h-9 rounded-full bg-slate-900 text-purple-300 border border-purple-800/40 flex items-center justify-center"><X className="w-5 h-5"/></button>
+          </div>
 
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-4">
-          {success ? (
-            <div className="py-8 text-center space-y-4"><CheckCircle2 className="w-16 h-16 mx-auto text-emerald-400"/><h3 className="text-xl font-black">Оголошення опубліковано!</h3><button type="button" onClick={onClose} className="px-8 py-3 bg-purple-600 rounded-2xl font-extrabold">Готово</button></div>
-          ) : (
-            <form onSubmit={submit} className="space-y-4">
-              <div className={`p-3 rounded-2xl border text-xs font-bold flex gap-2 ${canPublish ? 'bg-emerald-950/50 text-emerald-200 border-emerald-800/60' : 'bg-amber-950/60 text-amber-200 border-amber-800/60'}`}><MapPin className="w-4 h-4 shrink-0"/><span>{canPublish ? 'Місце визначено. Координати збережено.' : 'Визначте місце для оголошення.'}</span></div>
+          <div className="p-4 sm:p-6 overflow-y-auto space-y-4">
+            {success ? (
+              <div className="py-8 text-center space-y-4"><CheckCircle2 className="w-16 h-16 mx-auto text-emerald-400"/><h3 className="text-xl font-black">Оголошення опубліковано!</h3><button type="button" onClick={onClose} className="px-8 py-3 bg-purple-600 rounded-2xl font-extrabold">Готово</button></div>
+            ) : (
+              <form onSubmit={submit} className="space-y-4">
+                <div className={`p-3 rounded-2xl border text-xs font-bold flex gap-2 ${canPublish ? 'bg-emerald-950/50 text-emerald-200 border-emerald-800/60' : 'bg-amber-950/60 text-amber-200 border-amber-800/60'}`}><MapPin className="w-4 h-4 shrink-0"/><span>{canPublish ? 'Місце визначено. Координати збережено.' : 'Визначте місце для оголошення.'}</span></div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <button type="button" onClick={determineAutomatically} disabled={locating} className="py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-black flex items-center justify-center gap-2"><LocateFixed className="w-4 h-4"/>{locating ? <><Loader2 className="w-4 h-4 animate-spin"/>Визначаю...</> : 'Визначити автоматично'}</button>
-                <button type="button" onClick={() => setManualMode(true)} className="py-3 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-white font-black flex items-center justify-center gap-2"><MapPin className="w-4 h-4"/>Вказати місце на карті</button>
-              </div>
-
-              {manualMode && (
-                <div className="rounded-2xl overflow-hidden border-2 border-cyan-700/60 bg-slate-900">
-                  <div ref={mapElementRef} className="listing-map-picker w-full" style={{height:'360px', minHeight:'320px', width:'100%', position:'relative'}} />
-                  <div className="p-2 bg-slate-900 text-xs text-cyan-200 font-bold">{selectedCoordinates ? '📍 Точка вибрана. Координати збережено.' : 'Натисніть будь-яку точку на карті Рокитного.'}</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <button type="button" onClick={determineAutomatically} disabled={locating} className="py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-black flex items-center justify-center gap-2"><LocateFixed className="w-4 h-4"/>{locating ? <><Loader2 className="w-4 h-4 animate-spin"/>Визначаю...</> : 'Визначити автоматично'}</button>
+                  <button type="button" onClick={() => { setErrorMessage(''); setManualMode(true); }} className="py-3 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-white font-black flex items-center justify-center gap-2"><MapPin className="w-4 h-4"/>Вказати місце на карті</button>
                 </div>
-              )}
 
-              {errorMessage && <div className="p-3 bg-rose-950/80 text-rose-200 border border-rose-800/60 rounded-2xl text-xs font-bold flex gap-2"><AlertCircle className="w-4 h-4"/>{errorMessage}</div>}
+                {coordinates && !manualMode && <div className="p-3 rounded-2xl bg-emerald-950/50 border border-emerald-800/50 text-xs font-bold text-emerald-200">📍 Координати вибрані: {coordinates[0].toFixed(6)}, {coordinates[1].toFixed(6)}</div>}
 
-              <div><label className="text-xs font-extrabold text-purple-300">КАТЕГОРІЯ</label><div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">{(Object.keys(CATEGORIES) as CategoryId[]).filter(k=>k!=='sale').map(k=><button key={k} type="button" onClick={()=>{setCategory(k);setSubcategory('')}} className={`p-2.5 rounded-2xl text-left border ${category===k?'bg-purple-600 text-white border-purple-400':'bg-slate-900 text-purple-200 border-purple-900/40'}`}><span>{CATEGORIES[k].pinSymbol}</span><span className="block text-xs font-extrabold mt-1">{CATEGORIES[k].shortLabel}</span></button>)}</div></div>
+                {errorMessage && <div className="p-3 bg-rose-950/80 text-rose-200 border border-rose-800/60 rounded-2xl text-xs font-bold flex gap-2"><AlertCircle className="w-4 h-4"/>{errorMessage}</div>}
 
-              {currentCategory?.subcategories?.length ? <div><label className="text-xs font-extrabold text-cyan-300">ПІДКАТЕГОРІЯ</label><div className="flex flex-wrap gap-1.5 mt-2">{currentCategory.subcategories.map(s=><button key={s} type="button" onClick={()=>setSubcategory(subcategory===s?'':s)} className={`px-3 py-1.5 rounded-xl text-xs font-bold border ${subcategory===s?'bg-cyan-500 text-slate-950':'bg-slate-950 text-purple-200 border-purple-800/40'}`}>{s}</button>)}</div></div> : null}
+                <div><label className="text-xs font-extrabold text-purple-300">КАТЕГОРІЯ</label><div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">{(Object.keys(CATEGORIES) as CategoryId[]).filter(k=>k!=='sale').map(k=><button key={k} type="button" onClick={()=>{setCategory(k);setSubcategory('')}} className={`p-2.5 rounded-2xl text-left border ${category===k?'bg-purple-600 text-white border-purple-400':'bg-slate-900 text-purple-200 border-purple-900/40'}`}><span>{CATEGORIES[k].pinSymbol}</span><span className="block text-xs font-extrabold mt-1">{CATEGORIES[k].shortLabel}</span></button>)}</div></div>
 
-              <input required value={title} onChange={e=>setTitle(e.target.value)} placeholder={isUrgent?'Що потрібно терміново?':'Назва оголошення'} className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/>
-              <textarea value={description} onChange={e=>setDescription(e.target.value)} rows={3} placeholder="Опис та деталі" className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/>
-              <div className="grid grid-cols-2 gap-2.5"><input value={locationName} onChange={e=>setLocationName(e.target.value)} placeholder="Локація / назва місця" className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/><input value={phone} onChange={e=>setPhone(e.target.value)} required type="tel" placeholder="+380..." className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/></div>
-              <div className="grid grid-cols-2 gap-2.5"><input value={payAmount} onChange={e=>setPayAmount(e.target.value)} placeholder="Оплата, грн" className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/><select value={payType} onChange={e=>setPayType(e.target.value as PayType)} className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"><option value="fixed">Фіксована</option><option value="hourly">За годину</option><option value="daily">За день</option><option value="monthly">За місяць</option><option value="free">Безкоштовно</option></select></div>
-              <div className="grid grid-cols-2 gap-2.5"><select value={when} onChange={e=>setWhen(e.target.value)} className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"><option>Сьогодні</option><option>Завтра</option><option>Найближчим часом</option><option>Постійно</option></select><input value={duration} onChange={e=>setDuration(e.target.value)} placeholder="Тривалість" className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/></div>
-              <input value={photoUrl} onChange={e=>setPhotoUrl(e.target.value)} placeholder="Посилання на фото (необов'язково)" className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/>
+                {currentCategory?.subcategories?.length ? <div><label className="text-xs font-extrabold text-cyan-300">ПІДКАТЕГОРІЯ</label><div className="flex flex-wrap gap-1.5 mt-2">{currentCategory.subcategories.map(s=><button key={s} type="button" onClick={()=>setSubcategory(subcategory===s?'':s)} className={`px-3 py-1.5 rounded-xl text-xs font-bold border ${subcategory===s?'bg-cyan-500 text-slate-950':'bg-slate-950 text-purple-200 border-purple-800/40'}`}>{s}</button>)}</div></div> : null}
 
-              {isUrgent && <div className="p-3 rounded-2xl bg-rose-950/60 border border-rose-800/50 space-y-2"><div className="text-rose-300 text-xs font-black">🚨 ТЕРМІНОВА ДОПОМОГА</div><div className="flex flex-wrap gap-2">{(Object.keys(URGENT_TYPES_MAP) as UrgentHelpType[]).map(k=><button type="button" key={k} onClick={()=>setUrgentType(k)} className={`px-2 py-1.5 rounded-xl text-xs font-bold border ${urgentType===k?'bg-rose-600 text-white':'bg-slate-900 text-rose-200 border-rose-900'}`}>{URGENT_TYPES_MAP[k].label}</button>)}</div><div className="flex flex-wrap gap-2">{(Object.keys(URGENCY_LEVELS_MAP) as UrgencyLevel[]).map(k=><button type="button" key={k} onClick={()=>setUrgencyLevel(k)} className={`px-2 py-1.5 rounded-xl text-xs font-bold border ${urgencyLevel===k?'bg-rose-600 text-white':'bg-slate-900 text-rose-200 border-rose-900'}`}>{URGENCY_LEVELS_MAP[k].label.split('—')[0]}</button>)}</div></div>}
+                <input required value={title} onChange={e=>setTitle(e.target.value)} placeholder={isUrgent?'Що потрібно терміново?':'Назва оголошення'} className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/>
+                <textarea value={description} onChange={e=>setDescription(e.target.value)} rows={3} placeholder="Опис та деталі" className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/>
+                <div className="grid grid-cols-2 gap-2.5"><input value={locationName} onChange={e=>setLocationName(e.target.value)} placeholder="Локація / назва місця" className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/><input value={phone} onChange={e=>setPhone(e.target.value)} required type="tel" placeholder="+380..." className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/></div>
+                <div className="grid grid-cols-2 gap-2.5"><input value={payAmount} onChange={e=>setPayAmount(e.target.value)} placeholder="Оплата, грн" className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/><select value={payType} onChange={e=>setPayType(e.target.value as PayType)} className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"><option value="fixed">Фіксована</option><option value="hourly">За годину</option><option value="daily">За день</option><option value="monthly">За місяць</option><option value="free">Безкоштовно</option></select></div>
+                <div className="grid grid-cols-2 gap-2.5"><select value={when} onChange={e=>setWhen(e.target.value)} className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"><option>Сьогодні</option><option>Завтра</option><option>Найближчим часом</option><option>Постійно</option></select><input value={duration} onChange={e=>setDuration(e.target.value)} placeholder="Тривалість" className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/></div>
+                <input value={photoUrl} onChange={e=>setPhotoUrl(e.target.value)} placeholder="Посилання на фото (необов'язково)" className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/>
 
-              <button disabled={busy || !canPublish} type="submit" className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-black flex items-center justify-center gap-2 disabled:opacity-50"><Send className="w-4 h-4"/>{busy?'Публікація...':'Опублікувати оголошення'}</button>
-            </form>
-          )}
+                {isUrgent && <div className="p-3 rounded-2xl bg-rose-950/60 border border-rose-800/50 space-y-2"><div className="text-rose-300 text-xs font-black">🚨 ТЕРМІНОВА ДОПОМОГА</div><div className="flex flex-wrap gap-2">{(Object.keys(URGENT_TYPES_MAP) as UrgentHelpType[]).map(k=><button type="button" key={k} onClick={()=>setUrgentType(k)} className={`px-2 py-1.5 rounded-xl text-xs font-bold border ${urgentType===k?'bg-rose-600 text-white':'bg-slate-900 text-rose-200 border-rose-900'}`}>{URGENT_TYPES_MAP[k].label}</button>)}</div><div className="flex flex-wrap gap-2">{(Object.keys(URGENCY_LEVELS_MAP) as UrgencyLevel[]).map(k=><button type="button" key={k} onClick={()=>setUrgencyLevel(k)} className={`px-2 py-1.5 rounded-xl text-xs font-bold border ${urgencyLevel===k?'bg-rose-600 text-white':'bg-slate-900 text-rose-200 border-rose-900'}`}>{URGENCY_LEVELS_MAP[k].label.split('—')[0]}</button>)}</div></div>}
+
+                <button disabled={busy || !canPublish} type="submit" className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-black flex items-center justify-center gap-2 disabled:opacity-50"><Send className="w-4 h-4"/>{busy?'Публікація...':'Опублікувати оголошення'}</button>
+              </form>
+            )}
+          </div>
         </div>
       </div>
-    </div>
+
+      {manualMode && (
+        <div className="fixed inset-0 z-[200] bg-slate-950 flex flex-col">
+          <div className="shrink-0 px-4 py-3 bg-slate-950/95 border-b border-cyan-800/60 flex items-center justify-between gap-3">
+            <div>
+              <div className="font-black text-white">📍 Виберіть місце</div>
+              <div className="text-[11px] text-cyan-200/80">Натисніть будь-яку точку на карті Рокитного</div>
+            </div>
+            <button type="button" onClick={closeMapPicker} className="px-4 py-2 rounded-xl bg-cyan-600 text-white font-black text-sm">Готово</button>
+          </div>
+          <div ref={mapElementRef} className="flex-1 w-full listing-map-picker" style={{ minHeight: 0, height: '100%', width: '100%' }} />
+          <div className="shrink-0 p-3 bg-slate-950/95 border-t border-cyan-800/60 text-center text-xs font-bold text-cyan-100">
+            {coordinates ? `📍 Вибрано: ${coordinates[0].toFixed(6)}, ${coordinates[1].toFixed(6)}` : 'Торкніться карти, щоб поставити 📍'}
+          </div>
+        </div>
+      )}
+    </>
   );
 };
