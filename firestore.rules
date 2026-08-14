@@ -2,6 +2,13 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+    // Адміністратор: тільки власник сайту може видаляти будь-яке оголошення.
+    // Email береться з Firebase Auth token і не зберігається в документі оголошення.
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email == 'nazar0111111@gmail.com';
+    }
+
     match /listings/{listingId} {
       allow read: if true;
 
@@ -9,11 +16,12 @@ service cloud.firestore {
         && request.resource.data.authorId == request.auth.uid;
 
       allow update: if request.auth != null
-        && resource.data.authorId == request.auth.uid
-        && request.resource.data.authorId == resource.data.authorId;
+        && (isAdmin()
+          || (resource.data.authorId == request.auth.uid
+            && request.resource.data.authorId == resource.data.authorId));
 
       allow delete: if request.auth != null
-        && resource.data.authorId == request.auth.uid;
+        && (isAdmin() || resource.data.authorId == request.auth.uid);
     }
 
     match /comments/{commentId} {
