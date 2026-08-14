@@ -1,0 +1,42 @@
+name: Fix React hooks
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix conditional hook order
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('src/components/CreateListingModal.tsx')
+          s = p.read_text()
+          old = "  if (!isOpen) return null;\n  const isUrgent = category === 'urgent';"
+          new = "  const isUrgent = category === 'urgent';"
+          if old not in s:
+              raise SystemExit('Expected hook-order pattern not found')
+          s = s.replace(old, new, 1)
+          marker = "  }, [isOpen, manualMode]);\n\n  const handleSubmit"
+          replacement = "  }, [isOpen, manualMode]);\n\n  if (!isOpen) return null;\n\n  const handleSubmit"
+          if marker not in s:
+              raise SystemExit('Expected effect marker not found')
+          s = s.replace(marker, replacement, 1)
+          p.write_text(s)
+          PY
+      - name: Commit fix and remove temporary workflow
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add src/components/CreateListingModal.tsx .github/workflows/fix-react-hooks.yml
+          git commit -m 'fix: keep React hooks order stable' || exit 0
+          git rm .github/workflows/fix-react-hooks.yml
+          git commit -m 'chore: remove temporary hooks fix workflow'
+          git push
