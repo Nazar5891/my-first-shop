@@ -62,6 +62,18 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, 
     };
   }, [isOpen, manualMode]);
 
+  // Reset transient state every time the create form is opened.
+  // Without this, the previous successful publication remains visible
+  // and a new opening can incorrectly show "Оголошення опубліковано!".
+  useEffect(() => {
+    if (!isOpen) return;
+    setSuccess(false);
+    setErrorMessage('');
+    setBusy(false);
+    setManualMode(false);
+    setManualCoordinates(null);
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const handleSubmit = async (e: React.FormEvent) => {
