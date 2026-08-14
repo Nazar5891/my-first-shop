@@ -1,30 +1,28 @@
 name: Temporary admin delete fix
-on:
-  push:
-    branches: [main]
+on: push
 permissions:
   contents: write
 jobs:
   fix:
-    if: ${{ !contains(github.event.head_commit.message, 'fix: admin delete') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Patch admin delete access
+      - name: Patch source
         run: |
           python - <<'PY'
           from pathlib import Path
-          p = Path('src/components/ListingDetailBottomSheet.tsx')
-          s = p.read_text()
-          s = s.replace("  const isOwner = Boolean(auth.currentUser && listing.authorId === auth.currentUser.uid);", "  const isOwner = Boolean(auth.currentUser && listing.authorId === auth.currentUser.uid);\n  const isAdmin = Boolean(auth.currentUser?.email?.toLowerCase() === 'nazar0111111@gmail.com');\n  const canDelete = isOwner || isAdmin;")
-          s = s.replace("if (!currentUser || listing.authorId !== currentUser.uid || isDeleting) return;", "if (!currentUser || (!isOwner && !isAdmin) || isDeleting) return;")
-          s = s.replace("{isOwner && (", "{canDelete && (")
-          s = s.replace("title=\"Видалити моє оголошення\"", "title={isAdmin && !isOwner ? 'Адмін: видалити оголошення' : 'Видалити моє оголошення'}")
-          s = s.replace("if (!window.confirm('Видалити це оголошення назавжди?')) return;", "if (!window.confirm(isAdmin && !isOwner ? 'Видалити це оголошення як адміністратор назавжди?' : 'Видалити це оголошення назавжди?')) return;")
+          p=Path('src/components/ListingDetailBottomSheet.tsx')
+          s=p.read_text()
+          s=s.replace("  const isOwner = Boolean(auth.currentUser && listing.authorId === auth.currentUser.uid);", "  const isOwner = Boolean(auth.currentUser && listing.authorId === auth.currentUser.uid);\n  const isAdmin = Boolean(auth.currentUser?.email?.toLowerCase() === 'nazar0111111@gmail.com');\n  const canDelete = isOwner || isAdmin;")
+          s=s.replace("if (!currentUser || listing.authorId !== currentUser.uid || isDeleting) return;", "if (!currentUser || (!isOwner && !isAdmin) || isDeleting) return;")
+          s=s.replace("{isOwner && (", "{canDelete && (")
+          s=s.replace("title=\"Видалити моє оголошення\"", "title={isAdmin && !isOwner ? 'Адмін: видалити оголошення' : 'Видалити моє оголошення'}")
+          s=s.replace("if (!window.confirm('Видалити це оголошення назавжди?')) return;", "if (!window.confirm(isAdmin && !isOwner ? 'Видалити це оголошення як адміністратор назавжди?' : 'Видалити це оголошення назавжди?')) return;")
           p.write_text(s)
           PY
+          if git diff --quiet -- src/components/ListingDetailBottomSheet.tsx; then exit 0; fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add src/components/ListingDetailBottomSheet.tsx
-          git commit -m 'fix: admin delete' || exit 0
+          git commit -m 'fix: admin delete'
           git push
