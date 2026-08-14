@@ -3,18 +3,24 @@ import { Map, Search, Plus, Menu } from 'lucide-react';
 import { ActiveTab } from '../types';
 
 interface BottomNavProps { activeTab: ActiveTab; setActiveTab: (tab: ActiveTab) => void; onOpenCreateModal: () => void; urgentCount?: number; }
+const NAV_STATE = 'meisterOnlineNav';
 
 export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab, onOpenCreateModal, urgentCount = 0 }) => {
   useEffect(() => {
-    if (!window.history.state?.meisterOnlineNav) window.history.replaceState({ meisterOnlineNav: true, tab: activeTab }, '', window.location.href);
-    const onPopState = (event: PopStateEvent) => setActiveTab(event.state?.meisterOnlineNav ? (event.state.tab as ActiveTab) || 'map' : 'map');
+    if (!window.history.state?.[NAV_STATE]) {
+      window.history.replaceState({ ...(window.history.state || {}), [NAV_STATE]: true, tab: activeTab }, '', window.location.href);
+    }
+    const onPopState = (event: PopStateEvent) => {
+      if (event.state?.[NAV_STATE]) setActiveTab((event.state.tab as ActiveTab) || 'map');
+    };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, [setActiveTab, activeTab]);
+  }, [setActiveTab]);
 
   const navigate = (tab: ActiveTab) => {
+    if (tab === activeTab) return;
+    window.history.pushState({ ...(window.history.state || {}), [NAV_STATE]: true, tab }, '', window.location.href);
     setActiveTab(tab);
-    window.history.pushState({ meisterOnlineNav: true, tab }, '', window.location.href);
     if (tab === 'search') window.dispatchEvent(new Event('meister-focus-search'));
   };
 
