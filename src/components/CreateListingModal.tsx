@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { X, CheckCircle2, AlertCircle, Send, MapPin, LocateFixed, Loader2 } from 'lucide-react';
 import { CategoryId, CATEGORIES, UrgencyLevel, UrgentHelpType, URGENCY_LEVELS_MAP, URGENT_TYPES_MAP, Listing, PayType } from '../types';
-import { COMMUNITY_CENTER } from '../data/mockListings';
 import { ListingMapPicker } from './ListingMapPicker';
 
 interface CreateListingModalProps {
@@ -12,7 +11,7 @@ interface CreateListingModalProps {
   gpsEnabled?: boolean;
 }
 
-export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, onClose, onSubmit, userCoordinates = COMMUNITY_CENTER, gpsEnabled = false }) => {
+export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, onClose, onSubmit, userCoordinates, gpsEnabled = false }) => {
   const [category, setCategory] = useState<CategoryId>('part_time');
   const [subcategory, setSubcategory] = useState('');
   const [title, setTitle] = useState('');
@@ -35,8 +34,7 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, 
 
   const isUrgent = category === 'urgent';
   const currentCategory = CATEGORIES[category];
-  const existingGps = gpsEnabled && userCoordinates && (userCoordinates[0] !== COMMUNITY_CENTER[0] || userCoordinates[1] !== COMMUNITY_CENTER[1]);
-  const selectedCoordinates = coordinates || (existingGps ? userCoordinates : null);
+  const selectedCoordinates = coordinates || (gpsEnabled && userCoordinates ? userCoordinates : null);
   const canPublish = Boolean(selectedCoordinates);
 
   useEffect(() => {
@@ -46,6 +44,7 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, 
     setBusy(false);
     setMapOpen(false);
     setCoordinates(null);
+    setLocationName('');
   }, [isOpen]);
 
   const determineAutomatically = () => {
@@ -93,7 +92,7 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, 
         pay,
         payValueNumber: parseInt(payAmount.replace(/\D/g, ''), 10) || 0,
         payType,
-        locationName: locationName || 'Рокитнівська громада',
+        locationName: locationName.trim(),
         coordinates: selectedCoordinates!,
         when: isUrgent ? 'Терміново (зараз)' : when,
         duration,
@@ -131,39 +130,36 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, 
             ) : (
               <form onSubmit={submit} className="space-y-4">
                 <div className={`p-3 rounded-2xl border text-xs font-bold flex gap-2 ${canPublish ? 'bg-emerald-950/50 text-emerald-200 border-emerald-800/60' : 'bg-amber-950/60 text-amber-200 border-amber-800/60'}`}><MapPin className="w-4 h-4 shrink-0"/><span>{canPublish ? 'Місце визначено. Координати збережено.' : 'Визначте місце для оголошення.'}</span></div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <button type="button" onClick={determineAutomatically} disabled={locating} className="py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-black flex items-center justify-center gap-2"><LocateFixed className="w-4 h-4"/>{locating ? <><Loader2 className="w-4 h-4 animate-spin"/>Визначаю...</> : 'Визначити автоматично'}</button>
                   <button type="button" onClick={() => { setErrorMessage(''); setMapOpen(true); }} className="py-3 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-white font-black flex items-center justify-center gap-2"><MapPin className="w-4 h-4"/>Вказати місце на карті</button>
                 </div>
-
                 {coordinates && <div className="p-3 rounded-2xl bg-emerald-950/50 border border-emerald-800/50 text-xs font-bold text-emerald-200">📍 Координати вибрані: {coordinates[0].toFixed(6)}, {coordinates[1].toFixed(6)}</div>}
                 {errorMessage && <div className="p-3 bg-rose-950/80 text-rose-200 border border-rose-800/60 rounded-2xl text-xs font-bold flex gap-2"><AlertCircle className="w-4 h-4"/>{errorMessage}</div>}
-
                 <div><label className="text-xs font-extrabold text-purple-300">КАТЕГОРІЯ</label><div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">{(Object.keys(CATEGORIES) as CategoryId[]).filter(k=>k!=='sale').map(k=><button key={k} type="button" onClick={()=>{setCategory(k);setSubcategory('')}} className={`p-2.5 rounded-2xl text-left border ${category===k?'bg-purple-600 text-white border-purple-400':'bg-slate-900 text-purple-200 border-purple-900/40'}`}><span>{CATEGORIES[k].pinSymbol}</span><span className="block text-xs font-extrabold mt-1">{CATEGORIES[k].shortLabel}</span></button>)}</div></div>
-
                 {currentCategory?.subcategories?.length ? <div><label className="text-xs font-extrabold text-cyan-300">ПІДКАТЕГОРІЯ</label><div className="flex flex-wrap gap-1.5 mt-2">{currentCategory.subcategories.map(s=><button key={s} type="button" onClick={()=>setSubcategory(subcategory===s?'':s)} className={`px-3 py-1.5 rounded-xl text-xs font-bold border ${subcategory===s?'bg-cyan-500 text-slate-950':'bg-slate-950 text-purple-200 border-purple-800/40'}`}>{s}</button>)}</div></div> : null}
-
                 <input required value={title} onChange={e=>setTitle(e.target.value)} placeholder={isUrgent?'Що потрібно терміново?':'Назва оголошення'} className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/>
                 <textarea value={description} onChange={e=>setDescription(e.target.value)} rows={3} placeholder="Опис та деталі" className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/>
-                <div className="grid grid-cols-2 gap-2.5"><input value={locationName} onChange={e=>setLocationName(e.target.value)} placeholder="Локація / назва місця" className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/><input value={phone} onChange={e=>setPhone(e.target.value)} required type="tel" placeholder="+380..." className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/></div>
+                <div className="grid grid-cols-2 gap-2.5"><input value={locationName} onChange={e=>setLocationName(e.target.value)} placeholder="Вулиця, номер або назва місця (якщо не визначилось автоматично)" className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/><input value={phone} onChange={e=>setPhone(e.target.value)} required type="tel" placeholder="+380..." className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/></div>
                 <div className="grid grid-cols-2 gap-2.5"><input value={payAmount} onChange={e=>setPayAmount(e.target.value)} placeholder="Оплата, грн" className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/><select value={payType} onChange={e=>setPayType(e.target.value as PayType)} className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"><option value="fixed">Фіксована</option><option value="hourly">За годину</option><option value="daily">За день</option><option value="monthly">За місяць</option><option value="free">Безкоштовно</option></select></div>
                 <div className="grid grid-cols-2 gap-2.5"><select value={when} onChange={e=>setWhen(e.target.value)} className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"><option>Сьогодні</option><option>Завтра</option><option>Найближчим часом</option><option>Постійно</option></select><input value={duration} onChange={e=>setDuration(e.target.value)} placeholder="Тривалість" className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/></div>
                 <input value={photoUrl} onChange={e=>setPhotoUrl(e.target.value)} placeholder="Посилання на фото (необов'язково)" className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/>
-
                 {isUrgent && <div className="p-3 rounded-2xl bg-rose-950/60 border border-rose-800/50 space-y-2"><div className="text-rose-300 text-xs font-black">🚨 ТЕРМІНОВА ДОПОМОГА</div><div className="flex flex-wrap gap-2">{(Object.keys(URGENT_TYPES_MAP) as UrgentHelpType[]).map(k=><button type="button" key={k} onClick={()=>setUrgentType(k)} className={`px-2 py-1.5 rounded-xl text-xs font-bold border ${urgentType===k?'bg-rose-600 text-white':'bg-slate-900 text-rose-200 border-rose-900'}`}>{URGENT_TYPES_MAP[k].label}</button>)}</div><div className="flex flex-wrap gap-2">{(Object.keys(URGENCY_LEVELS_MAP) as UrgencyLevel[]).map(k=><button type="button" key={k} onClick={()=>setUrgencyLevel(k)} className={`px-2 py-1.5 rounded-xl text-xs font-bold border ${urgencyLevel===k?'bg-rose-600 text-white':'bg-slate-900 text-rose-200 border-rose-900'}`}>{URGENCY_LEVELS_MAP[k].label.split('—')[0]}</button>)}</div></div>}
-
                 <button disabled={busy || !canPublish} type="submit" className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-purple-600 to-cyan-600 text-white font-black flex items-center justify-center gap-2 disabled:opacity-50"><Send className="w-4 h-4"/>{busy?'Публікація...':'Опублікувати оголошення'}</button>
               </form>
             )}
           </div>
         </div>
       </div>
-
       <ListingMapPicker
         isOpen={mapOpen}
         initialCoordinates={coordinates}
-        onConfirm={(coords) => { setCoordinates(coords); setMapOpen(false); setErrorMessage(''); }}
+        onConfirm={(coords, detectedLocation) => {
+          setCoordinates(coords);
+          if (detectedLocation) setLocationName(detectedLocation);
+          setMapOpen(false);
+          setErrorMessage('');
+        }}
         onClose={() => setMapOpen(false)}
       />
     </>
