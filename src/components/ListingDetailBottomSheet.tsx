@@ -36,6 +36,8 @@ export const ListingDetailBottomSheet: React.FC<ListingDetailBottomSheetProps> =
   const urgencyInfo = listing.urgencyLevel ? URGENCY_LEVELS_MAP[listing.urgencyLevel] : null;
   const isRideshare = listing.category === 'rideshare' || Boolean(listing.rideRole);
   const isOwner = Boolean(auth.currentUser && listing.authorId === auth.currentUser.uid);
+  const isAdmin = Boolean(auth.currentUser?.email?.toLowerCase() === 'nazar0111111@gmail.com');
+  const canDelete = isOwner || isAdmin;
   const commentsList = listing.comments || [];
 
   const handleSubmitComment = async (e: React.FormEvent) => {
@@ -59,8 +61,8 @@ export const ListingDetailBottomSheet: React.FC<ListingDetailBottomSheetProps> =
 
   const handleDelete = async () => {
     const currentUser = auth.currentUser;
-    if (!currentUser || listing.authorId !== currentUser.uid || isDeleting) return;
-    if (!window.confirm('Видалити це оголошення назавжди?')) return;
+    if (!currentUser || (!isOwner && !isAdmin) || isDeleting) return;
+    if (!window.confirm(isAdmin && !isOwner ? 'Видалити це оголошення як адміністратор назавжди?' : 'Видалити це оголошення назавжди?')) return;
     setIsDeleting(true);
     try {
       const commentsSnap = await getDocs(query(collection(db, 'comments'), where('listingId', '==', listing.id)));
@@ -84,8 +86,8 @@ export const ListingDetailBottomSheet: React.FC<ListingDetailBottomSheetProps> =
       <div className="relative w-full sm:w-[420px] md:w-[460px] h-full bg-slate-950/98 backdrop-blur-2xl text-slate-100 shadow-2xl border-l-2 border-purple-600/80 overflow-hidden flex flex-col z-10 animate-slide-in-right">
         <div className="w-12 h-1.5 bg-purple-900/60 rounded-full mx-auto my-2 shrink-0 sm:hidden" />
         <div className="absolute top-3 right-3 flex items-center gap-1.5 z-20">
-          {isOwner && (
-            <button onClick={handleDelete} disabled={isDeleting} className="w-9 h-9 rounded-full bg-rose-950/90 hover:bg-rose-700 text-rose-200 border border-rose-600/60 flex items-center justify-center disabled:opacity-50" title="Видалити моє оголошення">
+          {canDelete && (
+            <button onClick={handleDelete} disabled={isDeleting} className="w-9 h-9 rounded-full bg-rose-950/90 hover:bg-rose-700 text-rose-200 border border-rose-600/60 flex items-center justify-center disabled:opacity-50" title={isAdmin && !isOwner ? 'Адмін: видалити оголошення' : 'Видалити моє оголошення'}>
               <Trash2 className="w-4 h-4" />
             </button>
           )}
