@@ -16,57 +16,20 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   urgentCount = 0,
 }) => {
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 p-3 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent pointer-events-none">
+    <div className="relative w-full shrink-0 z-40 p-3 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent pointer-events-none">
       <div className="max-w-md mx-auto bg-slate-950/90 backdrop-blur-2xl border border-purple-900/50 rounded-3xl shadow-2xl p-1.5 flex items-center justify-around pointer-events-auto ring-1 ring-purple-500/20">
-        {/* 1. Map Tab */}
-        <button
-          onClick={() => setActiveTab('map')}
-          className={`flex-1 py-2 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 ${
-            activeTab === 'map'
-              ? 'text-violet-300 font-black bg-purple-950/80 border border-purple-800/50 shadow-sm'
-              : 'text-purple-300/70 hover:text-white font-semibold'
-          }`}
-        >
-          <Map className="w-5 h-5" />
-          <span className="text-[11px] leading-none">Карта</span>
+        <button onClick={() => setActiveTab('map')} className={`flex-1 py-2 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 ${activeTab === 'map' ? 'text-violet-300 font-black bg-purple-950/80 border border-purple-800/50 shadow-sm' : 'text-purple-300/70 hover:text-white font-semibold'}`}>
+          <Map className="w-5 h-5" /><span className="text-[11px] leading-none">Карта</span>
         </button>
-
-        {/* 2. Search & List Tab */}
-        <button
-          onClick={() => setActiveTab('search')}
-          className={`flex-1 py-2 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 relative ${
-            activeTab === 'search' || activeTab === 'near'
-              ? 'text-violet-300 font-black bg-purple-950/80 border border-purple-800/50 shadow-sm'
-              : 'text-purple-300/70 hover:text-white font-semibold'
-          }`}
-        >
-          <Search className="w-5 h-5" />
-          <span className="text-[11px] leading-none">Знайти</span>
-          {urgentCount > 0 && (
-            <span className="absolute top-1 right-3 w-2 h-2 rounded-full bg-rose-500 animate-ping" />
-          )}
+        <button onClick={() => setActiveTab('search')} className={`flex-1 py-2 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 relative ${activeTab === 'search' || activeTab === 'near' ? 'text-violet-300 font-black bg-purple-950/80 border border-purple-800/50 shadow-sm' : 'text-purple-300/70 hover:text-white font-semibold'}`}>
+          <Search className="w-5 h-5" /><span className="text-[11px] leading-none">Знайти</span>
+          {urgentCount > 0 && <span className="absolute top-1 right-3 w-2 h-2 rounded-full bg-rose-500 animate-ping" />}
         </button>
-
-        {/* 3. Floating Add Button */}
-        <button
-          onClick={onOpenCreateModal}
-          className="mx-1 w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-violet-500 text-white flex items-center justify-center shadow-lg shadow-purple-950/80 hover:scale-105 active:scale-95 transition-all ring-4 ring-slate-950 border border-purple-400/40"
-          title="Додати оголошення"
-        >
+        <button onClick={onOpenCreateModal} className="mx-1 w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-violet-500 text-white flex items-center justify-center shadow-lg shadow-purple-950/80 hover:scale-105 active:scale-95 transition-all ring-4 ring-slate-950 border border-purple-400/40" title="Додати оголошення">
           <Plus className="w-6 h-6 stroke-[3]" />
         </button>
-
-        {/* 4. More Tab */}
-        <button
-          onClick={() => setActiveTab('more')}
-          className={`flex-1 py-2 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 ${
-            activeTab === 'more'
-              ? 'text-violet-300 font-black bg-purple-950/80 border border-purple-800/50 shadow-sm'
-              : 'text-purple-300/70 hover:text-white font-semibold'
-          }`}
-        >
-          <Menu className="w-5 h-5" />
-          <span className="text-[11px] leading-none">Ще</span>
+        <button onClick={() => setActiveTab('more')} className={`flex-1 py-2 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 ${activeTab === 'more' ? 'text-violet-300 font-black bg-purple-950/80 border border-purple-800/50 shadow-sm' : 'text-purple-300/70 hover:text-white font-semibold'}`}>
+          <Menu className="w-5 h-5" /><span className="text-[11px] leading-none">Ще</span>
         </button>
       </div>
     </div>
