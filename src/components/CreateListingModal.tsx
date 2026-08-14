@@ -1,8 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
-import L from 'leaflet';
+import React, { useEffect, useState } from 'react';
 import { X, CheckCircle2, AlertCircle, Send, MapPin, LocateFixed, Loader2 } from 'lucide-react';
 import { CategoryId, CATEGORIES, UrgencyLevel, UrgentHelpType, URGENCY_LEVELS_MAP, URGENT_TYPES_MAP, Listing, PayType } from '../types';
 import { COMMUNITY_CENTER } from '../data/mockListings';
+import { ListingMapPicker } from './ListingMapPicker';
 
 interface CreateListingModalProps {
   isOpen: boolean;
@@ -26,16 +26,12 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, 
   const [photoUrl, setPhotoUrl] = useState('');
   const [urgencyLevel, setUrgencyLevel] = useState<UrgencyLevel>('immediate');
   const [urgentType, setUrgentType] = useState<UrgentHelpType>('auto');
-  const [manualMode, setManualMode] = useState(false);
+  const [mapOpen, setMapOpen] = useState(false);
   const [coordinates, setCoordinates] = useState<[number, number] | null>(null);
   const [locating, setLocating] = useState(false);
   const [success, setSuccess] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [busy, setBusy] = useState(false);
-
-  const mapRef = useRef<L.Map | null>(null);
-  const mapElementRef = useRef<HTMLDivElement | null>(null);
-  const markerRef = useRef<L.Marker | null>(null);
 
   const isUrgent = category === 'urgent';
   const currentCategory = CATEGORIES[category];
@@ -43,109 +39,12 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, 
   const selectedCoordinates = coordinates || (existingGps ? userCoordinates : null);
   const canPublish = Boolean(selectedCoordinates);
 
-  const setMapMarker = (coords: [number, number], map: L.Map) => {
-    setCoordinates(coords);
-    if (markerRef.current) {
-      markerRef.current.setLatLng(coords);
-    } else {
-      markerRef.current = L.marker(coords, {
-        icon: L.divIcon({
-          className: 'listing-location-pin',
-          html: '<div style="font-size:34px;line-height:34px;filter:drop-shadow(0 2px 3px rgba(0,0,0,.7))">📍</div>',
-          iconSize: [34, 34],
-          iconAnchor: [17, 32]
-        })
-      }).addTo(map);
-    }
-  };
-
-  useEffect(() => {
-    if (!isOpen || !manualMode) return;
-
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-
-    const initMap = () => {
-      const el = mapElementRef.current;
-      if (cancelled || !el || mapRef.current) return;
-
-      const width = el.getBoundingClientRect().width;
-      const height = el.getBoundingClientRect().height;
-      if (width < 50 || height < 50) {
-        timer = setTimeout(initMap, 100);
-        return;
-      }
-
-      try {
-        const map = L.map(el, {
-          center: COMMUNITY_CENTER,
-          zoom: 14,
-          zoomControl: true,
-          attributionControl: true,
-          tap: true
-        });
-        mapRef.current = map;
-
-        // Use the same tile provider as the working main site map.
-        const primary = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
-          maxZoom: 19,
-          attribution: '&copy; OpenStreetMap &copy; CARTO'
-        }).addTo(map);
-
-        // If the primary tile host is unavailable, automatically add a stable OSM fallback.
-        let fallbackAdded = false;
-        const addFallback = () => {
-          if (fallbackAdded || cancelled) return;
-          fallbackAdded = true;
-          L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; OpenStreetMap contributors'
-          }).addTo(map);
-        };
-        primary.on('tileerror', addFallback);
-        setTimeout(addFallback, 5000);
-
-        map.on('click', (event: L.LeafletMouseEvent) => {
-          setMapMarker([event.latlng.lat, event.latlng.lng], map);
-        });
-
-        if (coordinates) {
-          map.setView(coordinates, 16, { animate: false });
-          setMapMarker(coordinates, map);
-        }
-
-        requestAnimationFrame(() => map.invalidateSize({ animate: false }));
-        setTimeout(() => map.invalidateSize({ animate: false }), 100);
-        setTimeout(() => map.invalidateSize({ animate: false }), 400);
-      } catch (error) {
-        console.error('Listing map initialization failed:', error);
-        setErrorMessage('Не вдалося завантажити карту. Спробуйте ще раз.');
-      }
-    };
-
-    const frame1 = requestAnimationFrame(() => {
-      requestAnimationFrame(initMap);
-    });
-
-    return () => {
-      cancelled = true;
-      cancelAnimationFrame(frame1);
-      if (timer) clearTimeout(timer);
-      if (mapRef.current) {
-        mapRef.current.off();
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
-      markerRef.current = null;
-    };
-  }, [isOpen, manualMode]);
-
   useEffect(() => {
     if (!isOpen) return;
     setSuccess(false);
     setErrorMessage('');
     setBusy(false);
-    setManualMode(false);
+    setMapOpen(false);
     setCoordinates(null);
   }, [isOpen]);
 
@@ -154,7 +53,6 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, 
       setErrorMessage('Цей браузер не підтримує визначення місцезнаходження.');
       return;
     }
-
     setLocating(true);
     setErrorMessage('');
     navigator.geolocation.getCurrentPosition(
@@ -162,24 +60,14 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, 
         const coords: [number, number] = [position.coords.latitude, position.coords.longitude];
         setCoordinates(coords);
         setLocating(false);
-        setManualMode(true);
+        setMapOpen(true);
       },
       error => {
         setLocating(false);
-        setErrorMessage(error.code === 1
-          ? 'Дозвольте браузеру доступ до геолокації та натисніть кнопку ще раз.'
-          : 'Не вдалося визначити місцезнаходження. Перевірте GPS.');
+        setErrorMessage(error.code === 1 ? 'Дозвольте браузеру доступ до геолокації та натисніть кнопку ще раз.' : 'Не вдалося визначити місцезнаходження. Перевірте GPS.');
       },
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
     );
-  };
-
-  const closeMapPicker = () => {
-    if (!coordinates) {
-      setErrorMessage('📍 Спочатку натисніть на карту та виберіть точку.');
-      return;
-    }
-    setManualMode(false);
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -246,11 +134,10 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, 
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                   <button type="button" onClick={determineAutomatically} disabled={locating} className="py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-60 text-white font-black flex items-center justify-center gap-2"><LocateFixed className="w-4 h-4"/>{locating ? <><Loader2 className="w-4 h-4 animate-spin"/>Визначаю...</> : 'Визначити автоматично'}</button>
-                  <button type="button" onClick={() => { setErrorMessage(''); setManualMode(true); }} className="py-3 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-white font-black flex items-center justify-center gap-2"><MapPin className="w-4 h-4"/>Вказати місце на карті</button>
+                  <button type="button" onClick={() => { setErrorMessage(''); setMapOpen(true); }} className="py-3 rounded-2xl bg-cyan-600 hover:bg-cyan-500 text-white font-black flex items-center justify-center gap-2"><MapPin className="w-4 h-4"/>Вказати місце на карті</button>
                 </div>
 
-                {coordinates && !manualMode && <div className="p-3 rounded-2xl bg-emerald-950/50 border border-emerald-800/50 text-xs font-bold text-emerald-200">📍 Координати вибрані: {coordinates[0].toFixed(6)}, {coordinates[1].toFixed(6)}</div>}
-
+                {coordinates && <div className="p-3 rounded-2xl bg-emerald-950/50 border border-emerald-800/50 text-xs font-bold text-emerald-200">📍 Координати вибрані: {coordinates[0].toFixed(6)}, {coordinates[1].toFixed(6)}</div>}
                 {errorMessage && <div className="p-3 bg-rose-950/80 text-rose-200 border border-rose-800/60 rounded-2xl text-xs font-bold flex gap-2"><AlertCircle className="w-4 h-4"/>{errorMessage}</div>}
 
                 <div><label className="text-xs font-extrabold text-purple-300">КАТЕГОРІЯ</label><div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-2">{(Object.keys(CATEGORIES) as CategoryId[]).filter(k=>k!=='sale').map(k=><button key={k} type="button" onClick={()=>{setCategory(k);setSubcategory('')}} className={`p-2.5 rounded-2xl text-left border ${category===k?'bg-purple-600 text-white border-purple-400':'bg-slate-900 text-purple-200 border-purple-900/40'}`}><span>{CATEGORIES[k].pinSymbol}</span><span className="block text-xs font-extrabold mt-1">{CATEGORIES[k].shortLabel}</span></button>)}</div></div>
@@ -273,21 +160,12 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, 
         </div>
       </div>
 
-      {manualMode && (
-        <div className="fixed inset-0 z-[200] bg-slate-950 flex flex-col">
-          <div className="shrink-0 px-4 py-3 bg-slate-950/95 border-b border-cyan-800/60 flex items-center justify-between gap-3">
-            <div>
-              <div className="font-black text-white">📍 Виберіть місце</div>
-              <div className="text-[11px] text-cyan-200/80">Натисніть будь-яку точку на карті Рокитного</div>
-            </div>
-            <button type="button" onClick={closeMapPicker} className="px-4 py-2 rounded-xl bg-cyan-600 text-white font-black text-sm">Готово</button>
-          </div>
-          <div ref={mapElementRef} className="flex-1 w-full listing-map-picker" style={{ minHeight: 0, height: '100%', width: '100%' }} />
-          <div className="shrink-0 p-3 bg-slate-950/95 border-t border-cyan-800/60 text-center text-xs font-bold text-cyan-100">
-            {coordinates ? `📍 Вибрано: ${coordinates[0].toFixed(6)}, ${coordinates[1].toFixed(6)}` : 'Торкніться карти, щоб поставити 📍'}
-          </div>
-        </div>
-      )}
+      <ListingMapPicker
+        isOpen={mapOpen}
+        initialCoordinates={coordinates}
+        onConfirm={(coords) => { setCoordinates(coords); setMapOpen(false); setErrorMessage(''); }}
+        onClose={() => setMapOpen(false)}
+      />
     </>
   );
 };
