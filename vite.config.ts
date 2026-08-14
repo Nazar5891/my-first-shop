@@ -5,7 +5,9 @@ import {defineConfig} from 'vite';
 
 export default defineConfig(() => {
   return {
-    base: '/my-first-shop/',
+    // Keep the project-page URL working while allowing the same app to be
+    // deployed as a GitHub user site at the domain root.
+    base: process.env.GITHUB_PAGES_BASE || '/my-first-shop/',
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
