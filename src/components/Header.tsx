@@ -14,6 +14,7 @@ export const Header: React.FC<HeaderProps> = ({searchQuery,setSearchQuery,select
  useEffect(()=>subscribeToAuth(setUser),[]);
  return <header className="sticky top-0 z-[1000] border-b border-yellow-400/20 bg-slate-950/95 px-3 py-3 shadow-2xl backdrop-blur-xl sm:px-5">
   <div className="mx-auto w-full max-w-6xl space-y-3">
+   <div className="overflow-hidden rounded-3xl border border-yellow-400/30 shadow-xl"><img src="/my-first-shop/meister-online-cover.svg" alt="Майстер Онлайн" className="block h-auto w-full" /></div>
    <div className="flex items-center justify-between gap-3">
     <div className="flex min-w-0 items-center gap-2">
      <button type="button" onClick={()=>setAccountOpen(true)} aria-label="Мій акаунт" className="relative flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full border-2 border-yellow-400/70 bg-slate-800 shadow-lg hover:scale-105 transition-transform">{user?.photoURL?<img src={user.photoURL} alt="Фото профілю" className="h-full w-full object-cover"/>:<UserRound className="h-5 w-5 text-yellow-300"/>}<span className={`absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-slate-950 ${user?'bg-emerald-400':'bg-slate-500'}`}/></button>
