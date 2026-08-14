@@ -108,7 +108,9 @@ export default function App() {
 
   const handleSearch = () => {
     setSubmittedSearchQuery(searchQuery.trim());
-    setActiveTab('search');
+    setSelectedListing(null);
+    setDetailListing(null);
+    setActiveTab('map');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
