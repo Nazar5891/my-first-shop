@@ -126,10 +126,8 @@ export const MapView: React.FC<MapViewProps> = ({
   };
 
   useEffect(() => {
-    if (!setUserCoordinates) return;
-    requestGPS();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    onGpsStatusChange?.(false);
+  }, [onGpsStatusChange]);
 
   useEffect(() => {
     const map = mapInstanceRef.current;
