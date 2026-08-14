@@ -10,9 +10,9 @@ interface ListingMapPickerProps {
   onClose: () => void;
 }
 
-// Do not use Rokytne as a default location. If the user has not selected/GPS-located a point,
-// show a neutral Ukraine view and ask them to choose their actual location.
-const UKRAINE_VIEW: [number, number] = [49.0, 31.5];
+// Neutral starting view: show the whole Rivne region, not Rokytne.
+const RIVNE_REGION_VIEW: [number, number] = [50.6, 26.3];
+const RIVNE_REGION_ZOOM = 8;
 
 export const ListingMapPicker: React.FC<ListingMapPickerProps> = ({ isOpen, initialCoordinates, onConfirm, onClose }) => {
   const elementRef = useRef<HTMLDivElement | null>(null);
@@ -55,8 +55,8 @@ export const ListingMapPicker: React.FC<ListingMapPickerProps> = ({ isOpen, init
       }
 
       const map = L.map(el, {
-        center: initialCoordinates ?? UKRAINE_VIEW,
-        zoom: initialCoordinates ? 16 : 6,
+        center: initialCoordinates ?? RIVNE_REGION_VIEW,
+        zoom: initialCoordinates ? 16 : RIVNE_REGION_ZOOM,
         zoomControl: true,
         attributionControl: true,
         tap: true,
