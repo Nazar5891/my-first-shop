@@ -62,11 +62,14 @@ header { position:relative; z-index:30; }
   .fixed.inset-0{align-items:flex-end !important;padding:0 !important;}
   .fixed.inset-0 > .relative,.fixed.inset-0 > .w-full{width:100% !important;max-width:100% !important;max-height:calc(100dvh - 8px) !important;margin:0 !important;border-radius:24px 24px 0 0 !important;}
   .fixed.inset-0 > .flex-1{display:none;}
-  /* Reserve the space occupied by the bottom navigation so the map never hides behind it. */
   .leaflet-container { height:calc(100% - var(--app-nav-height) - var(--app-safe-bottom)) !important; min-height:0 !important; }
   .leaflet-control-zoom{margin-bottom:12px !important; margin-right:12px !important;}
 }
 @media (min-width:641px) {
   .fixed.inset-0 > .relative,.fixed.inset-0 > .w-full{max-height:calc(100dvh - 32px) !important;}
 }
+
+/* Listing modal has its own fixed-height map block. Do not apply the global mobile navigation offset to it. */
+.listing-map-picker .leaflet-container { width:100% !important; height:100% !important; min-height:0 !important; }
+
 @media (prefers-reduced-motion:reduce) { *,*::before,*::after{scroll-behavior:auto !important;animation-duration:.01ms !important;animation-iteration-count:1 !important;transition-duration:.01ms !important;} }
