@@ -1,0 +1,46 @@
+name: Fix create listing modal reset
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Reset create modal state when reopened
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('src/components/CreateListingModal.tsx')
+          s = p.read_text(encoding='utf-8')
+          old = """  }, [isOpen, manualMode]);\n\n  if (!isOpen) return null;"""
+          new = """  }, [isOpen, manualMode]);\n\n  // Reset transient state every time the create form is opened.\n  // Without this, the previous successful publication remains visible\n  // and a new opening can incorrectly show \"Оголошення опубліковано!\".\n  useEffect(() => {\n    if (!isOpen) return;\n    setSuccess(false);\n    setErrorMessage('');\n    setBusy(false);\n    setManualMode(false);\n    setManualCoordinates(null);\n  }, [isOpen]);\n\n  if (!isOpen) return null;"""
+          if old not in s:
+              raise SystemExit('Target code was not found; refusing to modify the file.')
+          if 'Reset transient state every time the create form is opened.' in s:
+              raise SystemExit('Fix already present; nothing to do.')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+
+      - name: Commit fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/CreateListingModal.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "fix: reset create listing form on reopen"
+          git push
+
+      - name: Remove temporary workflow
+        if: always()
+        run: |
+          git rm -f .github/workflows/fix-create-listing-reset.yml || true
+          git diff --cached --quiet || git commit -m "chore: remove temporary fix workflow"
+          git push || true
