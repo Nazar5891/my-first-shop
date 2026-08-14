@@ -25,6 +25,7 @@ interface MapViewProps {
   onDetailListing?: (listing: Listing) => void;
   maxRadiusKm?: number | null;
   onChangeMaxRadiusKm?: (radius: number | null) => void;
+  onGpsStatusChange?: (enabled: boolean) => void;
 }
 
 const TILE_URLS: Record<MapTileStyle, { url: string; attr: string }> = {
@@ -38,7 +39,7 @@ export const MapView: React.FC<MapViewProps> = ({
   listings, selectedListing, onSelectListing, userCoordinates, setUserCoordinates,
   isPinSelectMode = false, selectedPinLocation, onPinSelected,
   activeNavigationListing = null, onStopNavigation, onCallListing, onRouteListing, onDetailListing,
-  maxRadiusKm = null, onChangeMaxRadiusKm
+  maxRadiusKm = null, onChangeMaxRadiusKm, onGpsStatusChange
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
@@ -98,6 +99,7 @@ export const MapView: React.FC<MapViewProps> = ({
     if (!navigator.geolocation) {
       alert('Геолокація не підтримується вашим браузером.');
       setGpsEnabled(false);
+      onGpsStatusChange?.(false);
       return;
     }
     setIsLocating(true);
@@ -106,6 +108,7 @@ export const MapView: React.FC<MapViewProps> = ({
         const coords: [number, number] = [position.coords.latitude, position.coords.longitude];
         setRealGpsCoordinates(coords);
         setGpsEnabled(true);
+        onGpsStatusChange?.(true);
         setUserCoordinates?.(coords);
         mapInstanceRef.current?.flyTo(coords, 16, { animate: true, duration: 1.5 });
         setIsLocating(false);
@@ -114,6 +117,7 @@ export const MapView: React.FC<MapViewProps> = ({
         console.log('GPS error:', error.message);
         setIsLocating(false);
         setGpsEnabled(false);
+        onGpsStatusChange?.(false);
         setRealGpsCoordinates(null);
         mapInstanceRef.current?.flyTo(COMMUNITY_CENTER, 14, { animate: true });
       },

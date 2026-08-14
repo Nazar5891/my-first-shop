@@ -9,12 +9,13 @@ interface CreateListingModalProps {
   onClose: () => void;
   onSubmit: (newListing: Omit<Listing, 'id' | 'createdAt' | 'viewsCount' | 'callsCount' | 'distanceMeters'>) => Promise<boolean>;
   userCoordinates?: [number, number];
+  gpsEnabled?: boolean;
 }
 
 const isCommunityCenter = (coords: [number, number]) =>
   Math.abs(coords[0] - COMMUNITY_CENTER[0]) < 0.000001 && Math.abs(coords[1] - COMMUNITY_CENTER[1]) < 0.000001;
 
-export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, onClose, onSubmit, userCoordinates = COMMUNITY_CENTER }) => {
+export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, onClose, onSubmit, userCoordinates = COMMUNITY_CENTER, gpsEnabled = false }) => {
   const [category, setCategory] = useState<CategoryId>('part_time');
   const [subcategory, setSubcategory] = useState('');
   const [title, setTitle] = useState('');
@@ -39,7 +40,7 @@ export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, 
 
   const isUrgent = category === 'urgent';
   const currentCategory = CATEGORIES[category];
-  const hasRealGps = !isCommunityCenter(userCoordinates);
+  const hasRealGps = gpsEnabled && !isCommunityCenter(userCoordinates);
   const selectedCoordinates = hasRealGps ? userCoordinates : manualCoordinates;
   const canPublish = hasRealGps || Boolean(manualCoordinates);
 
