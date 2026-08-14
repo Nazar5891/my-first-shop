@@ -1,0 +1,60 @@
+name: Fix GPS disabled state
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch GPS state
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          p = Path('src/App.tsx')
+          s = p.read_text()
+          s = s.replace("const [userCoords, setUserCoords] = useState<[number, number]>(COMMUNITY_CENTER);", "const [userCoords, setUserCoords] = useState<[number, number]>(COMMUNITY_CENTER);\n  const [gpsEnabled, setGpsEnabled] = useState(false);")
+          s = s.replace("<MapView listings={filteredListings} selectedListing={selectedListing} onSelectListing={handleSelectListing} userCoordinates={userCoords} setUserCoordinates={setUserCoords}", "<MapView listings={filteredListings} selectedListing={selectedListing} onSelectListing={handleSelectListing} userCoordinates={userCoords} setUserCoordinates={setUserCoords} onGpsStatusChange={setGpsEnabled}")
+          s = s.replace("<CreateListingModal isOpen={isCreateModalOpen} onClose={()=>setIsCreateModalOpen(false)} onSubmit={handleCreateListing} userCoordinates={userCoords}/>", "<CreateListingModal isOpen={isCreateModalOpen} onClose={()=>setIsCreateModalOpen(false)} onSubmit={handleCreateListing} userCoordinates={userCoords} gpsEnabled={gpsEnabled}/>")
+          p.write_text(s)
+
+          p = Path('src/components/MapView.tsx')
+          s = p.read_text()
+          s = s.replace("  maxRadiusKm?: number | null;\n  onChangeMaxRadiusKm?: (radius: number | null) => void;", "  maxRadiusKm?: number | null;\n  onChangeMaxRadiusKm?: (radius: number | null) => void;\n  onGpsStatusChange?: (enabled: boolean) => void;")
+          s = s.replace("  maxRadiusKm = null, onChangeMaxRadiusKm\n}) => {", "  maxRadiusKm = null, onChangeMaxRadiusKm, onGpsStatusChange\n}) => {")
+          s = s.replace("        setGpsEnabled(true);\n        setUserCoordinates?.(coords);", "        setGpsEnabled(true);\n        onGpsStatusChange?.(true);\n        setUserCoordinates?.(coords);")
+          s = s.replace("        setGpsEnabled(false);\n        setRealGpsCoordinates(null);", "        setGpsEnabled(false);\n        onGpsStatusChange?.(false);\n        setRealGpsCoordinates(null);")
+          s = s.replace("      setGpsEnabled(false);\n      return;", "      setGpsEnabled(false);\n      onGpsStatusChange?.(false);\n      return;")
+          p.write_text(s)
+
+          p = Path('src/components/CreateListingModal.tsx')
+          s = p.read_text()
+          s = s.replace("  userCoordinates?: [number, number];\n}", "  userCoordinates?: [number, number];\n  gpsEnabled?: boolean;\n}")
+          s = s.replace("export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, onClose, onSubmit, userCoordinates = COMMUNITY_CENTER }) => {", "export const CreateListingModal: React.FC<CreateListingModalProps> = ({ isOpen, onClose, onSubmit, userCoordinates = COMMUNITY_CENTER, gpsEnabled = false }) => {")
+          s = s.replace("  const hasRealGps = !isCommunityCenter(userCoordinates);\n  const selectedCoordinates = hasRealGps ? userCoordinates : manualCoordinates;", "  const hasRealGps = gpsEnabled && !isCommunityCenter(userCoordinates);\n  const selectedCoordinates = hasRealGps ? userCoordinates : manualCoordinates;")
+          p.write_text(s)
+          PY
+      - name: Commit fixes
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.tsx src/components/MapView.tsx src/components/CreateListingModal.tsx
+          git diff --cached --quiet && exit 0
+          git commit -m "Fix disabled GPS using stale coordinates"
+          git push
+      - name: Remove temporary workflow
+        if: always()
+        shell: bash
+        run: |
+          git rm -f .github/workflows/fix-gps-state.yml || true
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Remove temporary GPS fix workflow" || true
+          git push || true
