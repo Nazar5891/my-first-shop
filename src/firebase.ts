@@ -1,6 +1,14 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth } from 'firebase/auth';
-import { getFirestore, collection, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import {
+  getFirestore,
+  collection,
+  getDocs,
+  deleteDoc,
+  doc,
+  query,
+  where,
+} from 'firebase/firestore';
 import { getStorage, ref, deleteObject } from 'firebase/storage';
 
 const firebaseConfig = {
@@ -21,9 +29,8 @@ export const storage = getStorage(app);
 export default app;
 
 // Правило «Майстра»: оголошення зберігається 7 днів.
-// Після закінчення терміну воно не повинно залишатися ні в архіві,
-// ні в локальному стані застосунку. Фото видаляємо зі Storage перед
-// видаленням документа, щоб не залишати файл-сироту.
+// Після закінчення терміну воно не повинно залишатися в архіві.
+// Фото та пов'язані коментарі також очищаються.
 const LISTING_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
 
 const getExpiryMs = (data: Record<string, unknown>) => {
@@ -46,18 +53,40 @@ const deleteListingPhoto = async (photoUrl: string) => {
   try {
     await deleteObject(ref(storage, photoUrl));
   } catch (error: any) {
-    // Якщо файл уже відсутній, це теж успішне очищення.
+    // Якщо файл уже відсутній, очищення вважаємо успішним.
     if (error?.code === 'storage/object-not-found') return;
     throw error;
   }
 };
 
+const deleteListingComments = async (listingId: string) => {
+  const commentsSnapshot = await getDocs(
+    query(collection(db, 'comments'), where('listingId', '==', listingId))
+  );
+
+  await Promise.all(
+    commentsSnapshot.docs.map(commentDoc => deleteDoc(commentDoc.ref))
+  );
+};
+
 const cleanupExpiredListings = async () => {
   try {
-    const snapshot = await getDocs(collection(db, 'listings'));
     const now = Date.now();
+    const nowIso = new Date(now).toISOString();
+    const legacyCutoffIso = new Date(now - LISTING_LIFETIME_MS).toISOString();
 
-    await Promise.all(snapshot.docs.map(async listingDoc => {
+    // Не читаємо всю колекцію щогодини: шукаємо лише потенційно прострочені записи.
+    const [expiringSnapshot, legacySnapshot] = await Promise.all([
+      getDocs(query(collection(db, 'listings'), where('expiresAt', '<=', nowIso))),
+      getDocs(query(collection(db, 'listings'), where('createdAt', '<=', legacyCutoffIso))),
+    ]);
+
+    const uniqueDocs = new Map<string, typeof expiringSnapshot.docs[number]>();
+    [...expiringSnapshot.docs, ...legacySnapshot.docs].forEach(listingDoc => {
+      uniqueDocs.set(listingDoc.id, listingDoc);
+    });
+
+    await Promise.all(Array.from(uniqueDocs.values()).map(async listingDoc => {
       const data = listingDoc.data() as Record<string, unknown>;
       const expiryMs = getExpiryMs(data);
       if (!Number.isFinite(expiryMs) || expiryMs > now) return;
@@ -65,13 +94,19 @@ const cleanupExpiredListings = async () => {
       const photoUrl = typeof data.photoUrl === 'string' ? data.photoUrl : '';
 
       try {
-        // Спочатку видаляємо фото. Якщо Storage тимчасово недоступний,
-        // документ залишається і наступна погодинна перевірка спробує знову.
+        // Спочатку очищаємо фото та коментарі.
+        // Якщо очищення Storage не вдалося, саме оголошення не видаляємо:
+        // наступна перевірка спробує ще раз.
         await deleteListingPhoto(photoUrl);
-        await deleteDoc(doc(db, 'listings', listingDoc.id));
-        console.info('Прострочене оголошення та його фото очищено:', listingDoc.id);
+        await deleteListingComments(listingDoc.id);
+        await deleteDoc(listingDoc.ref);
+        console.info('Прострочене оголошення, фото та коментарі очищено:', listingDoc.id);
       } catch (error) {
-        console.error('Очищення простроченого оголошення не завершено; повторимо пізніше:', listingDoc.id, error);
+        console.error(
+          'Очищення простроченого оголошення не завершено; повторимо пізніше:',
+          listingDoc.id,
+          error
+        );
       }
     }));
   } catch (error) {
@@ -79,6 +114,9 @@ const cleanupExpiredListings = async () => {
   }
 };
 
-// Перевірка одразу після запуску та щогодини, поки сайт відкритий.
+// На Spark очищення виконується під час роботи сайту.
+// Перевірка одразу після запуску та раз на годину.
 void cleanupExpiredListings();
-setInterval(() => { void cleanupExpiredListings(); }, 60 * 60 * 1000);
+setInterval(() => {
+  void cleanupExpiredListings();
+}, 60 * 60 * 1000);
