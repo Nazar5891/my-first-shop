@@ -48,7 +48,7 @@ header { position:relative; z-index:30; }
 .listing-map-picker .leaflet-container { width:100% !important; height:100% !important; min-height:0 !important; max-height:none !important; background:#dbeafe !important; }
 .listing-map-overlay .leaflet-tile { width:256px !important; height:256px !important; }
 .listing-map-overlay .leaflet-control-container { position:absolute !important; inset:0 !important; }
-.listing-map-overlay .leaflet-control-zoom { position:absolute !important; top:14px !important; right:14px !important; left:auto !important; bottom:auto !important; margin:0 !important; z-index:4000 !important; }
+.listing-map-overlay .leaflet-control-zoom { position:absolute !important; top:-34px !important; right:14px !important; left:auto !important; bottom:auto !important; margin:0 !important; z-index:4000 !important; }
 
 @media (max-width:640px) {
   .fixed.inset-0:not(.listing-map-overlay) { align-items:flex-end !important; padding:0 !important; }
