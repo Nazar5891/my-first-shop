@@ -20,6 +20,7 @@ import { onAuthStateChanged, type User } from 'firebase/auth';
 import { Siren, SlidersHorizontal, Plus, Search, X } from 'lucide-react';
 
 const ADMIN_EMAIL = 'nazar0111111@gmail.com';
+const LISTING_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
 
 export default function App() {
   const [remoteListings, setRemoteListings] = useState<Listing[]>([]);
@@ -51,7 +52,15 @@ export default function App() {
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'listings'), snapshot => {
-      const remote = snapshot.docs.map(item => ({ ...(item.data() as Omit<Listing, 'id'>), id: item.id })) as Listing[];
+      const now = Date.now();
+      const remote = snapshot.docs
+        .map(item => ({ ...(item.data() as Omit<Listing, 'id'>), id: item.id }))
+        .filter(item => {
+          const expiresAt = (item as Listing & { expiresAt?: unknown }).expiresAt;
+          if (!expiresAt) return true;
+          const expiryMs = expiresAt instanceof Date ? expiresAt.getTime() : typeof expiresAt === 'string' ? Date.parse(expiresAt) : Number((expiresAt as { toMillis?: () => number })?.toMillis?.() ?? NaN);
+          return !Number.isFinite(expiryMs) || expiryMs > now;
+        }) as Listing[];
       setRemoteListings(remote);
     }, error => {
       console.error('Не вдалося завантажити оголошення з Firestore:', error);
@@ -116,6 +125,8 @@ export default function App() {
 
   const handleCreateListing = async (newListingData: Omit<Listing, 'id' | 'createdAt' | 'viewsCount' | 'callsCount' | 'distanceMeters'>): Promise<boolean> => {
     if (!user) { setActiveTab('more'); return false; }
+    const createdAt = new Date();
+    const expiresAt = new Date(createdAt.getTime() + LISTING_LIFETIME_MS);
     const listingData: Record<string, unknown> = {
       title: newListingData.title, category: newListingData.category, description: newListingData.description,
       pay: newListingData.pay, payValueNumber: newListingData.payValueNumber, payType: newListingData.payType,
@@ -123,7 +134,7 @@ export default function App() {
       duration: newListingData.duration, phone: newListingData.phone, isUrgent: newListingData.isUrgent,
       verified: newListingData.verified, authorId: user.uid,
       authorName: user.displayName || user.email?.split('@')[0] || 'Користувач',
-      createdAt: new Date().toISOString(), viewsCount: 1, callsCount: 0,
+      createdAt: createdAt.toISOString(), expiresAt: expiresAt.toISOString(), viewsCount: 1, callsCount: 0,
     };
     if (newListingData.subcategory) listingData.subcategory = newListingData.subcategory;
     if (newListingData.urgencyLevel) listingData.urgencyLevel = newListingData.urgencyLevel;
