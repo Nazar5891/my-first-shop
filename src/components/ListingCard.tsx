@@ -18,6 +18,12 @@ export const ListingCard: React.FC<ListingCardProps> = ({ listing, onClick, onCa
   const urgencyInfo = listing.urgencyLevel ? URGENCY_LEVELS_MAP[listing.urgencyLevel] : null;
   const isRideshare = listing.category === 'rideshare' || Boolean(listing.rideRole);
   const number = String(index + 1).padStart(2, '0');
+  const hasCoordinates = Array.isArray(listing.coordinates) && listing.coordinates.length === 2 && Number.isFinite(listing.coordinates[0]) && Number.isFinite(listing.coordinates[1]);
+
+  const openOnMap = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    window.dispatchEvent(new CustomEvent('meister-open-map-listing', { detail: listing }));
+  };
 
   return (
     <article onClick={onClick} className={`group cursor-pointer overflow-hidden border bg-[#080808] transition-all duration-200 ${isUrgent ? 'border-white' : isSelected ? 'border-white ring-1 ring-white/30' : 'border-white/10 hover:border-white/35'} ${variant === 'horizontal' ? 'w-72 sm:w-80 shrink-0' : 'w-full'}`}>
@@ -56,7 +62,10 @@ export const ListingCard: React.FC<ListingCardProps> = ({ listing, onClick, onCa
 
           <div className="flex items-center justify-between gap-3 pt-2.5 border-t border-white/10">
             <div className="min-w-0 text-[10px] text-white/35 uppercase tracking-[0.13em]"><div className="flex items-center gap-1.5 truncate"><MapPin className="w-3.5 h-3.5 shrink-0" /><span className="truncate">{listing.locationName}</span></div><div className="flex items-center gap-1.5 mt-1"><Clock className="w-3.5 h-3.5 shrink-0" /><span>{listing.duration}</span></div></div>
-            <button onClick={(e) => { e.stopPropagation(); onCallClick ? onCallClick(e) : onClick(); }} className="shrink-0 h-10 px-4 flex items-center gap-2 text-[10px] uppercase tracking-[0.12em] font-black bg-white text-black hover:bg-white/85 transition-colors active:scale-[0.98]"><Phone className="w-3.5 h-3.5" /><span>{isRideshare ? 'Зв’язатися' : 'Подзвонити'}</span></button>
+            <div className="flex items-center gap-2 shrink-0">
+              {hasCoordinates && <button type="button" onClick={openOnMap} aria-label="Показати на карті" title="Показати на карті" className="h-10 w-10 flex items-center justify-center border border-white/15 text-white/70 hover:bg-white hover:text-black hover:border-white transition-colors active:scale-[0.98]"><Navigation className="w-4 h-4" /></button>}
+              <button onClick={(e) => { e.stopPropagation(); onCallClick ? onCallClick(e) : onClick(); }} className="h-10 px-4 flex items-center gap-2 text-[10px] uppercase tracking-[0.12em] font-black bg-white text-black hover:bg-white/85 transition-colors active:scale-[0.98]"><Phone className="w-3.5 h-3.5" /><span>{isRideshare ? 'Зв’язатися' : 'Подзвонити'}</span></button>
+            </div>
           </div>
         </div>
       </div>
