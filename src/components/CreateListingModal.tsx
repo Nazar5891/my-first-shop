@@ -6,22 +6,22 @@ import { ListingMapPicker } from './ListingMapPicker';
 interface CreateListingModalProps { isOpen:boolean; onClose:()=>void; onSubmit:(newListing:Omit<Listing,'id'|'createdAt'|'viewsCount'|'callsCount'|'distanceMeters'>)=>Promise<boolean>; userCoordinates?:[number,number]; gpsEnabled?:boolean; }
 const MAIN_CATEGORY_IDS:CategoryId[]=['service','rideshare','sale','buy','rent','giveaway','other','urgent'];
 const MAX_SOURCE_PHOTO_BYTES=10*1024*1024;
-const MAX_IMAGE_SIDE=320;
-const JPEG_QUALITY=0.78;
-const MAX_PHOTO_BYTES=240*1024;
+const MAX_IMAGE_SIDE=1080;
+const JPEG_QUALITY=0.88;
+const MAX_PHOTO_BYTES=450*1024;
 const SALE_SUBCATEGORIES=CATEGORIES.sale.subcategories??[];
 
 const compressPhotoToDataUrl=(file:File):Promise<{dataUrl:string,size:number}>=>(new Promise((resolve,reject)=>{
  const image=new Image(); const objectUrl=URL.createObjectURL(file);
  image.onload=()=>{
   try{
-   const baseScale=Math.min(1,MAX_IMAGE_SIDE/Math.max(image.naturalWidth,image.naturalHeight));
    const tryCompress=(side:number,quality:number)=>{
     const scale=Math.min(1,side/Math.max(image.naturalWidth,image.naturalHeight));
     const width=Math.max(1,Math.round(image.naturalWidth*scale));
     const height=Math.max(1,Math.round(image.naturalHeight*scale));
     const canvas=document.createElement('canvas'); canvas.width=width; canvas.height=height;
     const ctx=canvas.getContext('2d'); if(!ctx)throw new Error('Не вдалося підготувати фото.');
+    ctx.imageSmoothingEnabled=true; ctx.imageSmoothingQuality='high';
     ctx.drawImage(image,0,0,width,height);
     canvas.toBlob(blob=>{
      if(!blob){reject(new Error('Не вдалося стиснути фото.'));return;}
@@ -29,8 +29,9 @@ const compressPhotoToDataUrl=(file:File):Promise<{dataUrl:string,size:number}>=>
      reader.onload=()=>{
       const dataUrl=String(reader.result||'');
       if(blob.size<=MAX_PHOTO_BYTES){URL.revokeObjectURL(objectUrl);resolve({dataUrl,size:blob.size});return;}
-      if(quality>0.42){tryCompress(side,Math.max(0.42,quality-0.12));return;}
-      if(side>240){tryCompress(Math.round(side*0.8),0.78);return;}
+      if(quality>0.52){tryCompress(side,Math.max(0.52,quality-0.08));return;}
+      if(side>720){tryCompress(Math.round(side*0.85),0.82);return;}
+      if(side>540){tryCompress(Math.round(side*0.85),0.78);return;}
       URL.revokeObjectURL(objectUrl);
       reject(new Error('Фото не вдалося стиснути до безпечного розміру. Спробуйте інше фото.'));
      };
@@ -38,7 +39,7 @@ const compressPhotoToDataUrl=(file:File):Promise<{dataUrl:string,size:number}>=>
      reader.readAsDataURL(blob);
     },'image/jpeg',quality);
    };
-   tryCompress(Math.min(MAX_IMAGE_SIDE,Math.max(image.naturalWidth,image.naturalHeight)),JPEG_QUALITY);
+   tryCompress(MAX_IMAGE_SIDE,JPEG_QUALITY);
   }catch(e){URL.revokeObjectURL(objectUrl);reject(e)}
  };
  image.onerror=()=>{URL.revokeObjectURL(objectUrl);reject(new Error('Не вдалося прочитати фото.'));}; image.src=objectUrl;
@@ -63,7 +64,7 @@ export const CreateListingModal:React.FC<CreateListingModalProps>=({isOpen,onClo
  <div><label className="text-xs font-extrabold text-purple-300">ОСНОВНА КАТЕГОРІЯ</label><div className="flex gap-2 overflow-x-auto mt-2 pb-1">{MAIN_CATEGORY_IDS.map(k=><button key={k} type="button" onClick={()=>{setCategory(k);setSubcategory('')}} className={`shrink-0 px-3 py-2 rounded-2xl text-left border ${category===k?'bg-purple-600 text-white border-purple-400':'bg-slate-900 text-purple-200 border-purple-900/40'}`}><span>{CATEGORIES[k].pinSymbol}</span><span className="block text-xs font-extrabold mt-1">{CATEGORIES[k].shortLabel}</span></button>)}</div></div>
  {subcategories.length>0&&<div><label className="text-xs font-extrabold text-cyan-300">ПІДКАТЕГОРІЯ {category==='sale'?'— ПРОДАМ':''}</label><div className="flex flex-wrap gap-1.5 mt-2">{subcategories.map(s=><button key={s} type="button" onClick={()=>setSubcategory(subcategory===s?'':s)} className={`px-3 py-1.5 rounded-xl text-xs font-bold border ${subcategory===s?'bg-cyan-500 text-slate-950':'bg-slate-950 text-purple-200 border-purple-800/40'}`}>{s}</button>)}</div></div>}
  <input required value={title} onChange={e=>setTitle(e.target.value)} placeholder={isUrgent?'Що потрібно терміново?':'Назва оголошення'} className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/><textarea value={description} onChange={e=>setDescription(e.target.value)} rows={3} placeholder="Опис та деталі" className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/><input value={locationName} onChange={e=>setLocationName(e.target.value)} placeholder="Вулиця, номер або назва місця" className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/><input value={phone} onChange={e=>setPhone(e.target.value)} required type="tel" placeholder="+380..." className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/>
- <div><label className="text-xs font-extrabold text-cyan-300">ФОТО ТОВАРУ — 1 ФОТО</label><div className="mt-2 rounded-2xl border border-dashed border-cyan-500/50 bg-slate-900/70 p-3">{photoPreview?<div className="relative"><img src={photoPreview} alt="Фото товару" className="w-full max-h-64 object-contain rounded-xl bg-slate-950"/><button type="button" onClick={clearPhoto} className="absolute right-2 top-2 rounded-full bg-rose-600 px-3 py-1.5 text-xs font-black text-white">Видалити</button><div className="mt-2 text-[10px] text-emerald-300 font-bold">Стиснено: {(photoOriginalSize/1024/1024).toFixed(1)} МБ → {(photoCompressedSize/1024).toFixed(0)} КБ · до 320px</div></div>:<div className="grid grid-cols-2 gap-2"><button type="button" disabled={processingPhoto} onClick={()=>cameraInputRef.current?.click()} className="py-7 rounded-xl bg-slate-950 text-cyan-200 font-black flex flex-col items-center justify-center gap-2"><Camera className="w-8 h-8"/><span>Зробити фото</span></button><button type="button" disabled={processingPhoto} onClick={()=>photoInputRef.current?.click()} className="py-7 rounded-xl bg-slate-950 text-cyan-200 font-black flex flex-col items-center justify-center gap-2"><ImagePlus className="w-8 h-8"/><span>З галереї</span></button></div>}{processingPhoto&&<div className="mt-2 text-center text-xs text-cyan-300 font-bold flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin"/>Стискаю фото…</div>}<input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e=>{void handlePhoto(e.target.files?.[0]);e.currentTarget.value=''}}/><input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={e=>{void handlePhoto(e.target.files?.[0]);e.currentTarget.value=''}}/></div></div>
+ <div><label className="text-xs font-extrabold text-cyan-300">ФОТО ТОВАРУ — 1 ФОТО</label><div className="mt-2 rounded-2xl border border-dashed border-cyan-500/50 bg-slate-900/70 p-3">{photoPreview?<div className="relative"><div className="w-full max-h-[70vh] flex items-center justify-center overflow-hidden rounded-xl bg-slate-950"><img src={photoPreview} alt="Фото товару" className="block max-w-full max-h-[70vh] w-auto h-auto object-contain rounded-xl"/></div><button type="button" onClick={clearPhoto} className="absolute right-2 top-2 rounded-full bg-rose-600 px-3 py-1.5 text-xs font-black text-white">Видалити</button><div className="mt-2 text-[10px] text-emerald-300 font-bold">Стиснено: {(photoOriginalSize/1024/1024).toFixed(1)} МБ → {(photoCompressedSize/1024).toFixed(0)} КБ · збережено пропорції</div></div>:<div className="grid grid-cols-2 gap-2"><button type="button" disabled={processingPhoto} onClick={()=>cameraInputRef.current?.click()} className="py-7 rounded-xl bg-slate-950 text-cyan-200 font-black flex flex-col items-center justify-center gap-2"><Camera className="w-8 h-8"/><span>Зробити фото</span></button><button type="button" disabled={processingPhoto} onClick={()=>photoInputRef.current?.click()} className="py-7 rounded-xl bg-slate-950 text-cyan-200 font-black flex flex-col items-center justify-center gap-2"><ImagePlus className="w-8 h-8"/><span>З галереї</span></button></div>}{processingPhoto&&<div className="mt-2 text-center text-xs text-cyan-300 font-bold flex items-center justify-center gap-2"><Loader2 className="w-4 h-4 animate-spin"/>Стискаю фото…</div>}<input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={e=>{void handlePhoto(e.target.files?.[0]);e.currentTarget.value=''}}/><input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={e=>{void handlePhoto(e.target.files?.[0]);e.currentTarget.value=''}}/></div></div>
  <div className="grid grid-cols-2 gap-2.5"><input value={payAmount} onChange={e=>setPayAmount(e.target.value)} placeholder="Ціна / оплата, грн" className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/><select value={payType} onChange={e=>setPayType(e.target.value as PayType)} className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"><option value="fixed">Фіксована</option><option value="hourly">За годину</option><option value="daily">За день</option><option value="monthly">За місяць</option><option value="free">Безкоштовно</option></select></div>
  <div className="grid grid-cols-2 gap-2.5"><select value={when} onChange={e=>setWhen(e.target.value)} className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"><option>Сьогодні</option><option>Завтра</option><option>Найближчим часом</option><option>Постійно</option></select><input value={duration} onChange={e=>setDuration(e.target.value)} placeholder="Тривалість" className="w-full px-3.5 py-3 rounded-xl bg-slate-900 border border-purple-900/50 text-white text-sm"/></div>
  {isUrgent&&<div className="p-3 rounded-2xl bg-rose-950/60 border border-rose-800/50 space-y-2"><div className="text-rose-300 text-xs font-black">🚨 ТЕРМІНОВА ДОПОМОГА</div><div className="flex flex-wrap gap-2">{(Object.keys(URGENT_TYPES_MAP) as UrgentHelpType[]).map(k=><button type="button" key={k} onClick={()=>setUrgentType(k)} className={`px-2 py-1.5 rounded-xl text-xs font-bold border ${urgentType===k?'bg-rose-600 text-white':'bg-slate-900 text-rose-200 border-rose-900'}`}>{URGENT_TYPES_MAP[k].label}</button>)}</div><div className="flex flex-wrap gap-2">{(Object.keys(URGENCY_LEVELS_MAP) as UrgencyLevel[]).map(k=><button type="button" key={k} onClick={()=>setUrgencyLevel(k)} className={`px-2 py-1.5 rounded-xl text-xs font-bold border ${urgencyLevel===k?'bg-rose-600 text-white':'bg-slate-900 text-rose-200 border-rose-900'}`}>{URGENCY_LEVELS_MAP[k].label.split('—')[0]}</button>)}</div></div>}
