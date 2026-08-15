@@ -42,29 +42,21 @@ export default function App() {
   const [routingListing, setRoutingListing] = useState<Listing | null>(null);
   const [reportingListing, setReportingListing] = useState<Listing | null>(null);
 
-  const listings = useMemo(() => [
-    ...INITIAL_LISTINGS,
-    ...remoteListings.map(item => ({ ...item, comments: commentsByListing[item.id] ?? item.comments ?? [] })),
-  ], [remoteListings, commentsByListing]);
-
+  const listings = useMemo(() => [...INITIAL_LISTINGS, ...remoteListings.map(item => ({ ...item, comments: commentsByListing[item.id] ?? item.comments ?? [] }))], [remoteListings, commentsByListing]);
   useEffect(() => onAuthStateChanged(auth, setUser), []);
-
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'listings'), snapshot => {
       const now = Date.now();
-      const remote = snapshot.docs
-        .map(item => ({ ...(item.data() as Omit<Listing, 'id'>), id: item.id }))
-        .filter(item => {
-          const expiresAt = (item as Listing & { expiresAt?: unknown }).expiresAt;
-          if (!expiresAt) return true;
-          const expiryMs = expiresAt instanceof Date ? expiresAt.getTime() : typeof expiresAt === 'string' ? Date.parse(expiresAt) : Number((expiresAt as { toMillis?: () => number })?.toMillis?.() ?? NaN);
-          return !Number.isFinite(expiryMs) || expiryMs > now;
-        }) as Listing[];
+      const remote = snapshot.docs.map(item => ({ ...(item.data() as Omit<Listing, 'id'>), id: item.id })).filter(item => {
+        const expiresAt = (item as Listing & { expiresAt?: unknown }).expiresAt;
+        if (!expiresAt) return true;
+        const expiryMs = expiresAt instanceof Date ? expiresAt.getTime() : typeof expiresAt === 'string' ? Date.parse(expiresAt) : Number((expiresAt as { toMillis?: () => number })?.toMillis?.() ?? NaN);
+        return !Number.isFinite(expiryMs) || expiryMs > now;
+      }) as Listing[];
       setRemoteListings(remote);
     }, error => { console.error('Не вдалося завантажити оголошення з Firestore:', error); setRemoteListings([]); });
     return unsubscribe;
   }, []);
-
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'comments'), snapshot => {
       const grouped: Record<string, ListingComment[]> = {};
@@ -77,16 +69,28 @@ export default function App() {
       });
       Object.values(grouped).forEach(list => list.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt))));
       setCommentsByListing(grouped);
-    }, error => console.error('Не вдалося завантажити відгуки з Firestore:', error));
+    }, error => console.error('Не вдалося завантажити відгуки:', error));
     return unsubscribe;
   }, []);
-
   useEffect(() => {
     const applySearch = () => setSubmittedSearchQuery(searchQuery);
     window.addEventListener('meister-focus-search', applySearch);
     return () => window.removeEventListener('meister-focus-search', applySearch);
   }, [searchQuery]);
-
+  useEffect(() => {
+    const openMapListing = (event: Event) => {
+      const listing = (event as CustomEvent<Listing>).detail;
+      if (!listing) return;
+      setSelectedListing(listing);
+      setDetailListing(null);
+      setRoutingListing(null);
+      setActiveNavigationListing(null);
+      setActiveTab('map');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+    window.addEventListener('meister-open-map-listing', openMapListing);
+    return () => window.removeEventListener('meister-open-map-listing', openMapListing);
+  }, []);
   const processedListings = useMemo(() => listings.map(item => ({ ...item, distanceMeters: calculateDistanceMeters(userCoords[0], userCoords[1], item.coordinates[0], item.coordinates[1]) })), [listings, userCoords]);
   const myListings = useMemo(() => user ? processedListings.filter(item => item.authorId === user.uid) : [], [processedListings, user]);
   const urgentCount = useMemo(() => processedListings.filter(l => l.isUrgent).length, [processedListings]);
@@ -103,9 +107,7 @@ export default function App() {
   }), [processedListings, selectedCategory, selectedSubcategory, submittedSearchQuery, maxRadiusKm]);
   const sortedSearchResults = useMemo(() => sortListings(filteredListings, 'distance'), [filteredListings]);
   const isAdmin = user?.email?.toLowerCase() === ADMIN_EMAIL;
-
   const handleSearch = () => { setSubmittedSearchQuery(searchQuery.trim()); setSelectedListing(null); setDetailListing(null); setActiveTab('map'); window.scrollTo({ top: 0, behavior: 'smooth' }); };
-
   const handleCreateListing = async (newListingData: Omit<Listing, 'id' | 'createdAt' | 'viewsCount' | 'callsCount' | 'distanceMeters'>): Promise<boolean> => {
     if (!user) { setActiveTab('more'); return false; }
     const createdAt = new Date(); const expiresAt = new Date(createdAt.getTime() + LISTING_LIFETIME_MS);
@@ -114,26 +116,19 @@ export default function App() {
     if (newListingData.urgencyLevel) listingData.urgencyLevel = newListingData.urgencyLevel;
     if (newListingData.urgentType) listingData.urgentType = newListingData.urgentType;
     if (newListingData.photoUrl) listingData.photoUrl = newListingData.photoUrl;
-    try {
-      const created = await addDoc(collection(db, 'listings'), listingData);
-      const dist = calculateDistanceMeters(userCoords[0], userCoords[1], newListingData.coordinates[0], newListingData.coordinates[1]);
-      const createdListing = { ...(listingData as Omit<Listing, 'id'>), id: created.id, distanceMeters: dist } as Listing;
-      setSelectedListing(createdListing); setDetailListing(createdListing); setIsCreateModalOpen(false); return true;
-    } catch (error) { console.error('Не вдалося опублікувати оголошення:', error); return false; }
+    try { const created = await addDoc(collection(db, 'listings'), listingData); const dist = calculateDistanceMeters(userCoords[0], userCoords[1], newListingData.coordinates[0], newListingData.coordinates[1]); const createdListing = { ...(listingData as Omit<Listing, 'id'>), id: created.id, distanceMeters: dist } as Listing; setSelectedListing(createdListing); setDetailListing(createdListing); setIsCreateModalOpen(false); return true; }
+    catch (error) { console.error('Не вдалося опублікувати оголошення:', error); return false; }
   };
-
   const handleAddComment = async (listingId: string, commentData: Omit<ListingComment, 'id' | 'createdAt'>): Promise<boolean> => {
     if (!user) return false;
     try { await addDoc(collection(db, 'comments'), { listingId, authorId: user.uid, authorName: commentData.authorName || user.displayName || 'Мешканець громади', text: commentData.text, rating: commentData.rating ?? 5, verifiedUser: true, createdAt: new Date().toISOString() }); return true; }
-    catch (error) { console.error('Не вдалося зберегти відгук у Firestore:', error); return false; }
+    catch (error) { console.error('Не вдалося зберегти відгук:', error); return false; }
   };
-
   const handleDeleteListing = async (id: string): Promise<boolean> => {
     if (!user || (!isAdmin && listings.find(item => item.id === id)?.authorId !== user.uid)) return false;
     try { await deleteDoc(doc(db, 'listings', id)); if (selectedListing?.id === id) setSelectedListing(null); if (detailListing?.id === id) setDetailListing(null); if (activeNavigationListing?.id === id) setActiveNavigationListing(null); return true; }
     catch (error) { console.error('Не вдалося видалити оголошення:', error); return false; }
   };
-
   const handleSelectListing = (listing: Listing | null) => { setSelectedListing(listing); if (listing) setDetailListing(listing); };
   const handleStartOnlineNavigation = (listing: Listing) => { setDetailListing(null); setRoutingListing(null); setSelectedListing(listing); setActiveNavigationListing(listing); setActiveTab('map'); };
 
