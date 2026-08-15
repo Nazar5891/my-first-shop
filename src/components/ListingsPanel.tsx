@@ -32,7 +32,7 @@ export const ListingsPanel: React.FC<ListingsPanelProps> = ({ listings, onSelect
   const searchCenter=selectedLocationCoords||userCoordinates||null;
   const filtered=useMemo(()=>{const q=normalize(query);return listings.filter(l=>{const text=[l.title,l.description,l.locationName,l.category,l.subcategory,l.pay].filter(Boolean).join(' ').toLocaleLowerCase('uk-UA'); const markerCoords=l.coordinates; const hasValidMarker=Array.isArray(markerCoords)&&markerCoords.length===2&&Number.isFinite(markerCoords[0])&&Number.isFinite(markerCoords[1]); const inSelectedPlace=!selectedLocation||(hasValidMarker&&!!selectedLocationCoords); const inRadius=!radiusKm||!searchCenter||(hasValidMarker&&distanceKm(searchCenter,markerCoords)<=radiusKm); return (!q||text.includes(q))&&(!category||l.category===category)&&(!subcategory||l.subcategory===subcategory)&&inSelectedPlace&&inRadius;});},[listings,query,category,subcategory,selectedLocation,radiusKm,searchCenter,selectedLocationCoords]);
   const chooseLocation=(p:LocationSuggestion)=>{setSelectedLocation(p.name);setSelectedLocationCoords(p.coords);setLocationQuery(p.name);setOpenMenu('radius');setSearchActive(false);};
-  const executeSearch=()=>{setSearchActive(true);setShowFilters(true);setOpenMenu(null);};
+  const executeSearch=()=>{setSearchActive(true);setShowFilters(false);setOpenMenu(null);};
   const clearFilters=()=>{setQuery('');setCategory('');setSubcategory('');setLocationQuery('');setSelectedLocation('');setSelectedLocationCoords(null);setRadiusKm(null);setOpenMenu(null);setSearchActive(false);};
   const hasFilters=Boolean(query||category||subcategory||selectedLocation||radiusKm);
 
