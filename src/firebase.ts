@@ -20,10 +20,37 @@ export const db = getFirestore(app);
 export const storage = getStorage(app);
 export default app;
 
-// Тимчасове автоматичне очищення: оголошення живе 7 днів.
-// Очищення запускається при відкритті сайту та повторюється щогодини,
-// поки сайт відкритий. Фото оголошення також видаляється зі Storage.
+// Правило «Майстра»: оголошення зберігається 7 днів.
+// Після закінчення терміну воно не повинно залишатися ні в архіві,
+// ні в локальному стані застосунку. Фото видаляємо зі Storage перед
+// видаленням документа, щоб не залишати файл-сироту.
 const LISTING_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
+
+const getExpiryMs = (data: Record<string, unknown>) => {
+  if (typeof data.expiresAt === 'string') {
+    const value = Date.parse(data.expiresAt);
+    if (Number.isFinite(value)) return value;
+  }
+
+  // Сумісність зі старими оголошеннями, де ще немає expiresAt.
+  if (typeof data.createdAt === 'string') {
+    const created = Date.parse(data.createdAt);
+    if (Number.isFinite(created)) return created + LISTING_LIFETIME_MS;
+  }
+
+  return NaN;
+};
+
+const deleteListingPhoto = async (photoUrl: string) => {
+  if (!photoUrl) return;
+  try {
+    await deleteObject(ref(storage, photoUrl));
+  } catch (error: any) {
+    // Якщо файл уже відсутній, це теж успішне очищення.
+    if (error?.code === 'storage/object-not-found') return;
+    throw error;
+  }
+};
 
 const cleanupExpiredListings = async () => {
   try {
@@ -31,26 +58,20 @@ const cleanupExpiredListings = async () => {
     const now = Date.now();
 
     await Promise.all(snapshot.docs.map(async listingDoc => {
-      const data = listingDoc.data();
-      const createdAt = typeof data.createdAt === 'string' ? Date.parse(data.createdAt) : NaN;
-      if (!Number.isFinite(createdAt) || now - createdAt < LISTING_LIFETIME_MS) return;
+      const data = listingDoc.data() as Record<string, unknown>;
+      const expiryMs = getExpiryMs(data);
+      if (!Number.isFinite(expiryMs) || expiryMs > now) return;
 
       const photoUrl = typeof data.photoUrl === 'string' ? data.photoUrl : '';
 
       try {
+        // Спочатку видаляємо фото. Якщо Storage тимчасово недоступний,
+        // документ залишається і наступна погодинна перевірка спробує знову.
+        await deleteListingPhoto(photoUrl);
         await deleteDoc(doc(db, 'listings', listingDoc.id));
+        console.info('Прострочене оголошення та його фото очищено:', listingDoc.id);
       } catch (error) {
-        console.error('Не вдалося видалити прострочене оголошення:', listingDoc.id, error);
-        return;
-      }
-
-      if (photoUrl) {
-        try {
-          await deleteObject(ref(storage, photoUrl));
-        } catch (error) {
-          // Фото могло бути вже видалене або URL міг бути недійсним.
-          console.warn('Не вдалося видалити фото простроченого оголошення:', error);
-        }
+        console.error('Очищення простроченого оголошення не завершено; повторимо пізніше:', listingDoc.id, error);
       }
     }));
   } catch (error) {
@@ -58,5 +79,6 @@ const cleanupExpiredListings = async () => {
   }
 };
 
+// Перевірка одразу після запуску та щогодини, поки сайт відкритий.
 void cleanupExpiredListings();
 setInterval(() => { void cleanupExpiredListings(); }, 60 * 60 * 1000);
