@@ -131,6 +131,7 @@ export default function App() {
   };
   const handleSelectListing = (listing: Listing | null) => { setSelectedListing(listing); if (listing) setDetailListing(listing); };
   const handleStartOnlineNavigation = (listing: Listing) => { setDetailListing(null); setRoutingListing(null); setSelectedListing(listing); setActiveNavigationListing(listing); setActiveTab('map'); };
+  const handleFindOnMap = (listing: Listing) => { setDetailListing(null); setRoutingListing(null); setSelectedListing(listing); setActiveNavigationListing(null); setActiveTab('map'); };
 
   return <div className="h-full min-h-screen flex flex-col bg-[url('https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=2000&auto=format&fit=crop')] bg-cover bg-center bg-fixed text-slate-100 font-sans selection:bg-purple-600 selection:text-white relative">
     <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-[2px] pointer-events-none z-0 cosmic-bg-overlay"/>
@@ -142,7 +143,7 @@ export default function App() {
         {activeTab==='near'&&<div className="h-full overflow-y-auto overscroll-contain p-3 sm:p-4 max-w-3xl mx-auto w-full pb-32"><NearMeView listings={processedListings} onSelectListing={setDetailListing} onCallListing={setCallingListing} selectedCategory={selectedCategory} maxRadiusKm={maxRadiusKm} onChangeMaxRadiusKm={setMaxRadiusKm} totalListingsCount={processedListings.length}/></div>}
         {activeTab==='more'&&<div className="h-full overflow-y-auto overscroll-contain p-3 sm:p-4 max-w-3xl mx-auto w-full pb-36"><MoreTab myListings={myListings} allListings={processedListings} onDeleteListing={handleDeleteListing} onSelectCategoryAndSubcategory={(catId,sub)=>{setSelectedCategory(catId);setSelectedSubcategory(sub||null);setActiveTab('search');}}/></div>}
       </main>
-      <ListingDetailBottomSheet listing={detailListing} onClose={()=>setDetailListing(null)} onCall={setCallingListing} onRoute={listing=>{setRoutingListing(listing);if(listing.category==='rideshare'){setSelectedListing(listing);setActiveTab('map');}}} onReport={setReportingListing} onAddComment={handleAddComment} onDeleted={id=>{setSelectedListing(null);setDetailListing(null);setActiveNavigationListing(active=>active?.id===id?null:active);}}/>
+      <ListingDetailBottomSheet listing={detailListing} onClose={()=>setDetailListing(null)} onCall={setCallingListing} onRoute={handleFindOnMap} onReport={setReportingListing} onAddComment={handleAddComment} onDeleted={id=>{setSelectedListing(null);setDetailListing(null);setActiveNavigationListing(active=>active?.id===id?null:active);}}/>
       <CreateListingModal isOpen={isCreateModalOpen} onClose={()=>setIsCreateModalOpen(false)} onSubmit={handleCreateListing} userCoordinates={userCoords} gpsEnabled={gpsEnabled}/>
       <CallModal listing={callingListing} onClose={()=>setCallingListing(null)}/><RouteModal listing={routingListing} onClose={()=>setRoutingListing(null)} onStartOnlineNavigation={handleStartOnlineNavigation}/><ReportModal listing={reportingListing} onClose={()=>setReportingListing(null)}/>
       <BottomNav activeTab={activeTab} setActiveTab={tab=>{setActiveTab(tab);if(tab!=='near')setIsNearMeActive(false);}} onOpenCreateModal={()=>{if(user)setIsCreateModalOpen(true);else setActiveTab('more');}} urgentCount={urgentCount}/>
