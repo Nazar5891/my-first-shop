@@ -49,8 +49,13 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab, o
 
   useEffect(() => {
     const openAccount = () => navigate('more');
+    const closeAccount = () => navigate('map');
     window.addEventListener('meister-open-account', openAccount);
-    return () => window.removeEventListener('meister-open-account', openAccount);
+    window.addEventListener('meister-close-account', closeAccount);
+    return () => {
+      window.removeEventListener('meister-open-account', openAccount);
+      window.removeEventListener('meister-close-account', closeAccount);
+    };
   }, [activeTab]);
 
   return <div className="fixed left-0 right-0 bottom-0 w-full z-[5000] p-3 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent pointer-events-none" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
