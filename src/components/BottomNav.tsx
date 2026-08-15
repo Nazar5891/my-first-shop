@@ -40,8 +40,9 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab, o
         <span className="text-[11px] leading-none">Оголошення</span>
         {urgentCount > 0 && <span className="absolute top-1 right-[calc(50%+3.5rem)] w-2 h-2 rounded-full bg-white animate-ping" />}
       </button>
-      <button onClick={onOpenCreateModal} className="mx-1 w-12 h-12 rounded-2xl bg-white text-black flex items-center justify-center shadow-lg shadow-black/50 hover:scale-105 active:scale-95 transition-all ring-4 ring-slate-950 border border-white/80" title="Додати оголошення">
-        <Plus className="w-6 h-6 stroke-[3]" />
+      <button onClick={onOpenCreateModal} className="mx-1 w-16 h-12 rounded-2xl bg-white text-black flex items-center justify-center gap-1.5 px-2 shadow-lg shadow-black/50 hover:scale-105 active:scale-95 transition-all ring-4 ring-slate-950 border border-white/80" title="Опублікувати оголошення">
+        <Plus className="w-5 h-5 stroke-[3]" />
+        <span className="text-[8px] font-black uppercase leading-tight text-center">Опублікувати</span>
       </button>
       <button onClick={() => navigate('map')} className={`flex-1 py-2 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 ${activeTab === 'map' ? 'text-white font-black bg-white/10 border border-white/15 shadow-sm' : 'text-white/50 hover:text-white font-semibold'}`}>
         <Map className="w-5 h-5" />
