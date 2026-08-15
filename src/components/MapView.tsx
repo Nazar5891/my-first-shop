@@ -32,7 +32,7 @@ export const MapView: React.FC<MapViewProps> = ({
   const mapContainerRef=useRef<HTMLDivElement>(null), mapInstanceRef=useRef<L.Map|null>(null), tileLayerRef=useRef<L.TileLayer|null>(null), hybridOverlayRef=useRef<L.TileLayer|null>(null);
   const markersGroupRef=useRef<L.LayerGroup|null>(null), routeGroupRef=useRef<L.LayerGroup|null>(null), userMarkerRef=useRef<L.Marker|null>(null);
   const radiusCircleRef=useRef<L.Circle|null>(null), pinMarkerRef=useRef<L.Marker|null>(null), onSelectRef=useRef(onSelectListing), onPinRef=useRef(onPinSelected);
-  const [mapStyle,setMapStyle]=useState<MapTileStyle>('light'),[showStyleMenu,setShowStyleMenu]=useState(false),[showRadiusMenu,setShowRadiusMenu]=useState(false);
+  const [mapStyle,setMapStyle]=useState<MapTileStyle>('hybrid'),[showStyleMenu,setShowStyleMenu]=useState(false),[showRadiusMenu,setShowRadiusMenu]=useState(false);
   const [isLocating,setIsLocating]=useState(false),[gpsEnabled,setGpsEnabled]=useState(false),[realGpsCoordinates,setRealGpsCoordinates]=useState<[number,number]|null>(null);
   const [routeLoading,setRouteLoading]=useState(false),[routeError,setRouteError]=useState(false),[routeNeedsGps,setRouteNeedsGps]=useState(false),[routeInfo,setRouteInfo]=useState<{distance:number;duration:number}|null>(null);
   useEffect(()=>{onSelectRef.current=onSelectListing;onPinRef.current=onPinSelected},[onSelectListing,onPinSelected]);
