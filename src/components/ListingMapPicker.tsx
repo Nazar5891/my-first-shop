@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { Check, LocateFixed, Search, X } from 'lucide-react';
@@ -10,7 +11,6 @@ interface ListingMapPickerProps {
   onClose: () => void;
 }
 
-// Карта не обмежена Рокитним: можна вибрати будь-яке місце в Україні та за її межами.
 const UKRAINE_VIEW: [number, number] = [49.0, 31.5];
 const UKRAINE_ZOOM = 6;
 
@@ -128,9 +128,7 @@ export const ListingMapPicker: React.FC<ListingMapPickerProps> = ({ isOpen, init
     setSearchBusy(true);
     setSearchError('');
     try {
-      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&q=${encodeURIComponent(query)}`, {
-        headers: { Accept: 'application/json' },
-      });
+      const response = await fetch(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=1&q=${encodeURIComponent(query)}`, { headers: { Accept: 'application/json' } });
       if (!response.ok) throw new Error('Search failed');
       const results = await response.json();
       const result = results?.[0];
@@ -161,9 +159,7 @@ export const ListingMapPicker: React.FC<ListingMapPickerProps> = ({ isOpen, init
     let locationName: string | undefined;
     try {
       const [lat, lon] = selected;
-      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&zoom=18&addressdetails=1`, {
-        headers: { Accept: 'application/json' },
-      });
+      const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lon)}&zoom=18&addressdetails=1`, { headers: { Accept: 'application/json' } });
       if (response.ok) {
         const data = await response.json();
         const a = data?.address ?? {};
@@ -182,24 +178,34 @@ export const ListingMapPicker: React.FC<ListingMapPickerProps> = ({ isOpen, init
 
   if (!isOpen) return null;
 
-  return (
-    <div className="listing-map-overlay fixed inset-0 z-[9999] bg-slate-950 flex flex-col">
-      <div className="listing-map-header shrink-0 bg-slate-950 border-b border-purple-900/50 p-3 space-y-2">
-        <div className="flex items-center justify-between gap-3">
-          <div><div className="font-black text-white">Виберіть місце</div><div className="text-xs text-purple-300">Рівне, Рокитне або будь-яке інше місто</div></div>
-          <button type="button" onClick={onClose} className="w-10 h-10 shrink-0 rounded-full bg-slate-900 border border-purple-800 text-white flex items-center justify-center"><X /></button>
+  const overlay = (
+    <div className="listing-map-overlay" style={{ position: 'fixed', inset: 0, width: '100vw', height: '100dvh', zIndex: 99999, overflow: 'hidden' }}>
+      <div className="listing-map-header" style={{ position: 'fixed', top: 0, left: 0, right: 0, zIndex: 3500 }}>
+        <div className="shrink-0 bg-slate-950 border-b border-purple-900/50 p-3 space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <div><div className="font-black text-white">Виберіть місце</div><div className="text-xs text-purple-300">Рівне, Рокитне або будь-яке інше місто</div></div>
+            <button type="button" onClick={onClose} className="w-10 h-10 shrink-0 rounded-full bg-slate-900 border border-purple-800 text-white flex items-center justify-center"><X /></button>
+          </div>
+          <div className="flex gap-2">
+            <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') searchPlace(); }} placeholder="Знайти місто або адресу, напр. Рівне" className="min-w-0 flex-1 px-3 py-2.5 rounded-xl bg-slate-900 border border-purple-800/60 text-white text-sm outline-none focus:border-cyan-500" />
+            <button type="button" onClick={searchPlace} disabled={searchBusy || !searchQuery.trim()} className="px-3 rounded-xl bg-purple-600 text-white font-black disabled:opacity-50 flex items-center gap-1.5"><Search className="w-4 h-4" />{searchBusy ? '...' : 'Знайти'}</button>
+          </div>
+          {searchError && <div className="text-[11px] font-bold text-rose-300 px-1">{searchError}</div>}
         </div>
-        <div className="flex gap-2">
-          <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') searchPlace(); }} placeholder="Знайти місто або адресу, напр. Рівне" className="min-w-0 flex-1 px-3 py-2.5 rounded-xl bg-slate-900 border border-purple-800/60 text-white text-sm outline-none focus:border-cyan-500" />
-          <button type="button" onClick={searchPlace} disabled={searchBusy || !searchQuery.trim()} className="px-3 rounded-xl bg-purple-600 text-white font-black disabled:opacity-50 flex items-center gap-1.5"><Search className="w-4 h-4" />{searchBusy ? '...' : 'Знайти'}</button>
+      </div>
+
+      <div ref={elementRef} className="listing-map-picker" style={{ position: 'fixed', inset: 0, width: '100vw', height: '100dvh', zIndex: 1 }} />
+
+      <div className="listing-map-footer" style={{ position: 'fixed', left: 0, right: 0, bottom: 0, zIndex: 6000, width: '100vw' }}>
+        <div className="p-3 bg-slate-950 border-t border-purple-900/50 flex gap-2 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))]">
+          <button type="button" onClick={locate} disabled={gpsBusy} className="flex-1 py-3 rounded-2xl bg-emerald-600 text-white font-black flex items-center justify-center gap-2 disabled:opacity-60"><LocateFixed className="w-4 h-4" />{gpsBusy ? 'Визначаю...' : 'Моє місце'}</button>
+          <button type="button" onClick={confirm} disabled={!selected || addressBusy} className="flex-1 py-3 rounded-2xl bg-cyan-600 text-white font-black flex items-center justify-center gap-2 disabled:opacity-40"><Check className="w-4 h-4" />{addressBusy ? 'Визначаю адресу...' : 'Готово'}</button>
         </div>
-        {searchError && <div className="text-[11px] font-bold text-rose-300 px-1">{searchError}</div>}
       </div>
-      <div ref={elementRef} className="listing-map-picker flex-1 min-h-0 w-full" />
-      <div className="listing-map-footer shrink-0 p-3 bg-slate-950 border-t border-purple-900/50 flex gap-2">
-        <button type="button" onClick={locate} disabled={gpsBusy} className="flex-1 py-3 rounded-2xl bg-emerald-600 text-white font-black flex items-center justify-center gap-2 disabled:opacity-60"><LocateFixed className="w-4 h-4"/>{gpsBusy ? 'Визначаю...' : 'Моє місце'}</button>
-        <button type="button" onClick={confirm} disabled={!selected || addressBusy} className="flex-1 py-3 rounded-2xl bg-cyan-600 text-white font-black flex items-center justify-center gap-2 disabled:opacity-40"><Check className="w-4 h-4"/>{addressBusy ? 'Визначаю адресу...' : 'Готово'}</button>
-      </div>
+
+      <style>{`.listing-map-overlay .leaflet-control-zoom{position:absolute!important;top:110px!important;right:14px!important;left:auto!important;bottom:auto!important;z-index:7000!important}`}</style>
     </div>
   );
+
+  return createPortal(overlay, document.body);
 };
