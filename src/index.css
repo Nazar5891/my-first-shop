@@ -16,13 +16,25 @@ header { position:relative; z-index:30; }
 .fixed.inset-0 .overflow-y-auto { overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
 .fixed.bottom-0 { z-index:5000 !important; }
 
-/* POLISSYA NEXUS — Minimal Gothic / Technology, monochrome */
+/* POLISSYA NEXUS — Minimal Gothic / Technology / Monochrome */
 .cosmic-bg-overlay { background:radial-gradient(circle at 50% 10%,rgba(255,255,255,.045),transparent 52%),radial-gradient(circle at 80% 85%,rgba(255,255,255,.025),transparent 45%),rgba(5,5,5,.94); }
-.cosmic-glass-panel { background:rgba(10,10,10,.82); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border:1px solid rgba(255,255,255,.12); box-shadow:0 8px 32px rgba(0,0,0,.65); }
-.cosmic-glass-card { background:rgba(14,14,14,.84); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,.10); box-shadow:0 4px 20px rgba(0,0,0,.55); }
-.cosmic-glass-card:hover { border-color:rgba(255,255,255,.28); box-shadow:0 8px 28px rgba(255,255,255,.055); }
+.cosmic-glass-panel { background:rgba(10,10,10,.88); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border:1px solid rgba(255,255,255,.13); box-shadow:0 8px 32px rgba(0,0,0,.7); }
+.cosmic-glass-card { background:rgba(14,14,14,.88); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,.11); box-shadow:0 4px 20px rgba(0,0,0,.6); }
+.cosmic-glass-card:hover { border-color:rgba(255,255,255,.3); box-shadow:0 8px 28px rgba(255,255,255,.06); }
 .cosmic-glow-purple { box-shadow:0 0 20px rgba(255,255,255,.12); }
 .cosmic-glow-red { box-shadow:0 0 20px rgba(255,255,255,.16); }
+
+/* Global monochrome override for existing Tailwind UI utilities. */
+[class*="purple-"],[class*="violet-"],[class*="indigo-"] { --tw-gradient-from:#171717 !important; --tw-gradient-to:#050505 !important; --tw-gradient-stops:#171717,#050505 !important; }
+[class*="text-purple-"],[class*="text-violet-"],[class*="text-indigo-"] { color:#e5e5e5 !important; }
+[class*="border-purple-"],[class*="border-violet-"],[class*="border-indigo-"] { border-color:rgba(255,255,255,.16) !important; }
+[class*="bg-purple-"],[class*="bg-violet-"],[class*="bg-indigo-"] { background-color:#111 !important; }
+[class*="from-purple-"],[class*="from-violet-"],[class*="from-indigo-"] { --tw-gradient-from:#171717 !important; }
+[class*="to-purple-"],[class*="to-violet-"],[class*="to-indigo-"] { --tw-gradient-to:#050505 !important; }
+[class*="via-purple-"],[class*="via-violet-"],[class*="via-indigo-"] { --tw-gradient-via:#0b0b0b !important; }
+[class*="text-cyan-"],[class*="text-rose-"],[class*="text-pink-"] { color:#e5e5e5 !important; }
+[class*="border-cyan-"],[class*="border-rose-"],[class*="border-pink-"] { border-color:rgba(255,255,255,.16) !important; }
+[class*="bg-cyan-"],[class*="bg-rose-"],[class*="bg-pink-"] { background-color:#111 !important; }
 
 /* Subtle technical line/grid texture */
 body::before { content:""; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.035; background-image:linear-gradient(rgba(255,255,255,.35) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.35) 1px,transparent 1px); background-size:32px 32px; mask-image:linear-gradient(to bottom,black,transparent 75%); }
@@ -44,11 +56,8 @@ body::before { content:""; position:fixed; inset:0; pointer-events:none; z-index
 .leaflet-popup-tip { background:#0b0b0b !important; }
 .leaflet-marker-icon.user-location-marker { z-index:100 !important; pointer-events:none !important; }
 .leaflet-marker-icon.custom-listing-marker { z-index:2000 !important; pointer-events:auto !important; touch-action:manipulation !important; }
-
-/* Main map zoom controls: keep both + and − above the fixed bottom navigation. */
 .leaflet-container .leaflet-control-zoom { position:absolute !important; top:auto !important; right:14px !important; left:auto !important; bottom:calc(var(--app-nav-height) + var(--app-safe-bottom) + 14px) !important; margin:0 !important; z-index:4500 !important; }
 
-/* Map picker: viewport is locked; map is background; header/footer are fixed layers. */
 .listing-map-overlay { position:fixed !important; inset:0 !important; width:100vw !important; height:100dvh !important; max-height:none !important; min-height:100dvh !important; padding:0 !important; margin:0 !important; overflow:hidden !important; display:block !important; z-index:9999 !important; }
 .listing-map-overlay > .listing-map-header { position:fixed !important; top:0 !important; left:0 !important; right:0 !important; z-index:3500 !important; width:100% !important; max-height:none !important; }
 .listing-map-overlay > .listing-map-picker { position:fixed !important; inset:0 !important; width:100vw !important; height:100dvh !important; min-height:0 !important; max-height:none !important; overflow:hidden !important; z-index:1 !important; }
@@ -56,7 +65,6 @@ body::before { content:""; position:fixed; inset:0; pointer-events:none; z-index
 .listing-map-picker .leaflet-container { width:100% !important; height:100% !important; min-height:0 !important; max-height:none !important; background:#111 !important; }
 .listing-map-overlay .leaflet-tile { width:256px !important; height:256px !important; }
 .listing-map-overlay .leaflet-control-container { position:absolute !important; inset:0 !important; }
-/* Zoom controls inside the picker stay below its fixed header. */
 .listing-map-overlay .leaflet-control-zoom { position:absolute !important; top:126px !important; right:14px !important; left:auto !important; bottom:auto !important; margin:0 !important; z-index:7000 !important; }
 
 @media (max-width:640px) {
