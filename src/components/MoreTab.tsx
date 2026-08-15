@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trash2 } from 'lucide-react';
+import { Trash2, X } from 'lucide-react';
 import { Listing } from '../types';
 import { AuthPanel } from './AuthPanel';
 
@@ -25,8 +25,19 @@ export const MoreTab: React.FC<MoreTabProps> = ({ myListings, onDeleteListing })
     setStatusMessage(success ? '✅ Оголошення видалено.' : '❌ Не вдалося видалити оголошення.');
   };
 
+  const closeAccount = () => window.dispatchEvent(new Event('meister-close-account'));
+
   return (
     <div className="space-y-5 pb-24">
+      <div className="sticky top-0 z-30 -mx-1 px-1 pt-1 pb-2 bg-slate-950/80 backdrop-blur-xl">
+        <div className="flex items-center justify-between rounded-2xl border border-purple-800/50 bg-slate-950/95 px-4 py-3 shadow-xl">
+          <div className="text-base font-black text-white">Мій акаунт</div>
+          <button type="button" onClick={closeAccount} aria-label="Закрити Мій акаунт" title="Закрити" className="w-10 h-10 rounded-xl flex items-center justify-center bg-slate-800 hover:bg-slate-700 active:scale-95 text-white border border-purple-700/50">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
       <AuthPanel />
 
       <section className="bg-slate-900/95 rounded-3xl p-5 border-2 border-cyan-800/50 shadow-2xl space-y-3" aria-label="Мої оголошення">
@@ -59,12 +70,7 @@ export const MoreTab: React.FC<MoreTabProps> = ({ myListings, onDeleteListing })
                   <div className="text-sm font-extrabold text-white truncate">{item.title}</div>
                   <div className="text-[11px] text-cyan-300/70 truncate">{item.pay} · {item.locationName}</div>
                 </div>
-                <button
-                  type="button"
-                  disabled={deletingId === item.id}
-                  onClick={() => handleDelete(item.id)}
-                  className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-black shadow-lg"
-                >
+                <button type="button" disabled={deletingId === item.id} onClick={() => handleDelete(item.id)} className="shrink-0 inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white text-xs font-black shadow-lg">
                   <Trash2 className="w-3.5 h-3.5" />
                   {deletingId === item.id ? '…' : 'Видалити'}
                 </button>
