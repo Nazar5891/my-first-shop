@@ -14,7 +14,7 @@ header { position:relative; z-index:30; }
 .fixed.inset-0 { z-index:100 !important; }
 .fixed.inset-0 > * { max-height:calc(100dvh - 24px); }
 .fixed.inset-0 .overflow-y-auto { overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
-.fixed.bottom-0 { z-index:60 !important; padding-bottom:calc(0.75rem + var(--app-safe-bottom)); }
+.fixed.bottom-0 { z-index:5000 !important; }
 .cosmic-bg-overlay { background:radial-gradient(circle at 50% 20%,rgba(124,58,237,.15),transparent 60%),radial-gradient(circle at 80% 80%,rgba(219,39,119,.1),transparent 50%),rgba(10,11,16,.88); }
 .cosmic-glass-panel { background:rgba(13,14,22,.78); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border:1px solid rgba(139,92,246,.25); box-shadow:0 8px 32px 0 rgba(0,0,0,.5); }
 .cosmic-glass-card { background:rgba(18,19,31,.8); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid rgba(139,92,246,.2); box-shadow:0 4px 20px rgba(0,0,0,.4); }
@@ -40,6 +40,9 @@ header { position:relative; z-index:30; }
 .leaflet-marker-icon.user-location-marker { z-index:100 !important; pointer-events:none !important; }
 .leaflet-marker-icon.custom-listing-marker { z-index:2000 !important; pointer-events:auto !important; touch-action:manipulation !important; }
 
+/* Main map zoom controls: keep both + and − above the fixed bottom navigation. */
+.leaflet-container .leaflet-control-zoom { position:absolute !important; top:auto !important; right:14px !important; left:auto !important; bottom:calc(var(--app-nav-height) + var(--app-safe-bottom) + 14px) !important; margin:0 !important; z-index:4500 !important; }
+
 /* Map picker: viewport is locked; map is background; header/footer are fixed layers. */
 .listing-map-overlay { position:fixed !important; inset:0 !important; width:100vw !important; height:100dvh !important; max-height:none !important; min-height:100dvh !important; padding:0 !important; margin:0 !important; overflow:hidden !important; display:block !important; z-index:9999 !important; }
 .listing-map-overlay > .listing-map-header { position:fixed !important; top:0 !important; left:0 !important; right:0 !important; z-index:3500 !important; width:100% !important; max-height:none !important; }
@@ -48,7 +51,7 @@ header { position:relative; z-index:30; }
 .listing-map-picker .leaflet-container { width:100% !important; height:100% !important; min-height:0 !important; max-height:none !important; background:#dbeafe !important; }
 .listing-map-overlay .leaflet-tile { width:256px !important; height:256px !important; }
 .listing-map-overlay .leaflet-control-container { position:absolute !important; inset:0 !important; }
-/* Zoom controls are below the fixed header; no negative top offsets. */
+/* Zoom controls inside the picker stay below its fixed header. */
 .listing-map-overlay .leaflet-control-zoom { position:absolute !important; top:126px !important; right:14px !important; left:auto !important; bottom:auto !important; margin:0 !important; z-index:7000 !important; }
 
 @media (max-width:640px) {
