@@ -1,9 +1,9 @@
 (() => {
-  const selector = 'img[src^="data:image/webp"], img[src^="data:image/jpeg"], img[src^="data:image/jpg"]';
+  const selector = 'img[src^="data:image/"]';
 
   const openViewer = (img) => {
     const overlay = document.createElement('div');
-    overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.96);display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;touch-action:none;';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.96);display:flex;align-items:center;justify-content:center;padding:12px;box-sizing:border-box;';
     const close = () => overlay.remove();
     overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
     const closeButton = document.createElement('button');
@@ -20,12 +20,12 @@
 
   const enhance = () => {
     document.querySelectorAll(selector).forEach(img => {
+      if (img.dataset.photoViewerReady === '1') return;
       const parent = img.parentElement;
-      if (!parent || img.dataset.photoViewerReady === '1') return;
-      if (!String(parent.className || '').includes('max-h-52')) return;
-
+      if (!parent) return;
+      const isListingPhoto = String(parent.className || '').includes('max-h-52') || img.closest('.animate-slide-in-right');
+      if (!isListingPhoto) return;
       img.dataset.photoViewerReady = '1';
-      // Show the complete original aspect ratio inside the listing.
       img.classList.remove('object-cover','h-full');
       img.style.setProperty('object-fit','contain','important');
       img.style.setProperty('width','100%','important');
@@ -33,7 +33,6 @@
       img.style.setProperty('max-height','70vh','important');
       img.style.setProperty('display','block','important');
       img.style.cursor = 'zoom-in';
-
       parent.classList.remove('max-h-52','h-full');
       parent.style.setProperty('height','auto','important');
       parent.style.setProperty('max-height','70vh','important');
@@ -42,11 +41,9 @@
       parent.style.setProperty('align-items','center','important');
       parent.style.setProperty('justify-content','center','important');
       parent.style.cursor = 'zoom-in';
-
       img.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); openViewer(img); });
     });
   };
-
   enhance();
   new MutationObserver(enhance).observe(document.body,{childList:true,subtree:true});
 })();
