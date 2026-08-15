@@ -82,7 +82,7 @@ export default function App() {
       const listing = (event as CustomEvent<Listing>).detail;
       if (!listing) return;
       setSelectedListing(listing);
-      setDetailListing(null);
+      setDetailListing(listing);
       setRoutingListing(null);
       setActiveNavigationListing(null);
       setActiveTab('map');
