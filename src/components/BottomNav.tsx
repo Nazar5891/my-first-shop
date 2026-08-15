@@ -45,7 +45,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab, o
     if (tab === 'search') window.dispatchEvent(new Event('meister-focus-search'));
   };
 
-  return <div className="relative w-full shrink-0 z-40 p-3 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent pointer-events-none">
+  return <div className="fixed left-0 right-0 bottom-0 w-full z-[5000] p-3 bg-gradient-to-t from-slate-950 via-slate-950/80 to-transparent pointer-events-none" style={{ paddingBottom: 'calc(0.75rem + env(safe-area-inset-bottom, 0px))' }}>
     <div className="max-w-md mx-auto bg-slate-950/90 backdrop-blur-2xl border border-purple-900/50 rounded-3xl shadow-2xl p-1.5 flex items-center justify-around pointer-events-auto ring-1 ring-purple-500/20">
       <button onClick={() => navigate('map')} className={`flex-1 py-2 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 ${activeTab === 'map' ? 'text-violet-300 font-black bg-purple-950/80 border border-purple-800/50 shadow-sm' : 'text-purple-300/70 hover:text-white font-semibold'}`}><Map className="w-5 h-5" /><span className="text-[11px] leading-none">Карта</span></button>
       <button onClick={() => navigate('search')} className={`flex-1 py-2 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 relative ${activeTab === 'search' || activeTab === 'near' ? 'text-violet-300 font-black bg-purple-950/80 border border-purple-800/50 shadow-sm' : 'text-purple-300/70 hover:text-white font-semibold'}`}><Search className="w-5 h-5" /><span className="text-[11px] leading-none">Знайти</span>{urgentCount > 0 && <span className="absolute top-1 right-3 w-2 h-2 rounded-full bg-rose-500 animate-ping" />}</button>
