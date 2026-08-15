@@ -1,11 +1,32 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Map, Search, Plus, Menu } from 'lucide-react';
 import { ActiveTab } from '../types';
+import { subscribeToAuth } from '../auth';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../firebase';
 
 interface BottomNavProps { activeTab: ActiveTab; setActiveTab: (tab: ActiveTab) => void; onOpenCreateModal: () => void; urgentCount?: number; }
 const NAV_STATE = 'meisterOnlineNav';
 
 export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab, onOpenCreateModal, urgentCount = 0 }) => {
+  const [profilePhoto, setProfilePhoto] = useState('');
+
+  useEffect(() => {
+    let stopProfile: (() => void) | null = null;
+    const stopAuth = subscribeToAuth(user => {
+      setProfilePhoto('');
+      stopProfile?.();
+      stopProfile = null;
+      if (!user) return;
+      stopProfile = onSnapshot(doc(db, 'users', user.uid), snap => {
+        const data = snap.exists() ? snap.data() : {};
+        const custom = typeof data.photo === 'string' ? data.photo : '';
+        setProfilePhoto(custom || user.photoURL || '');
+      }, () => setProfilePhoto(user.photoURL || ''));
+    });
+    return () => { stopProfile?.(); stopAuth(); };
+  }, []);
+
   useEffect(() => {
     if (!window.history.state?.[NAV_STATE]) {
       window.history.replaceState({ ...(window.history.state || {}), [NAV_STATE]: true, tab: activeTab }, '', window.location.href);
@@ -29,7 +50,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, setActiveTab, o
       <button onClick={() => navigate('map')} className={`flex-1 py-2 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 ${activeTab === 'map' ? 'text-violet-300 font-black bg-purple-950/80 border border-purple-800/50 shadow-sm' : 'text-purple-300/70 hover:text-white font-semibold'}`}><Map className="w-5 h-5" /><span className="text-[11px] leading-none">Карта</span></button>
       <button onClick={() => navigate('search')} className={`flex-1 py-2 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 relative ${activeTab === 'search' || activeTab === 'near' ? 'text-violet-300 font-black bg-purple-950/80 border border-purple-800/50 shadow-sm' : 'text-purple-300/70 hover:text-white font-semibold'}`}><Search className="w-5 h-5" /><span className="text-[11px] leading-none">Знайти</span>{urgentCount > 0 && <span className="absolute top-1 right-3 w-2 h-2 rounded-full bg-rose-500 animate-ping" />}</button>
       <button onClick={onOpenCreateModal} className="mx-1 w-12 h-12 rounded-2xl bg-gradient-to-tr from-purple-600 via-indigo-600 to-violet-500 text-white flex items-center justify-center shadow-lg shadow-purple-950/80 hover:scale-105 active:scale-95 transition-all ring-4 ring-slate-950 border border-purple-400/40" title="Додати оголошення"><Plus className="w-6 h-6 stroke-[3]" /></button>
-      <button onClick={() => navigate('more')} className={`flex-1 py-2 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 ${activeTab === 'more' ? 'text-violet-300 font-black bg-purple-950/80 border border-purple-800/50 shadow-sm' : 'text-purple-300/70 hover:text-white font-semibold'}`}><Menu className="w-5 h-5" /><span className="text-[11px] leading-none">Ще</span></button>
+      <button onClick={() => navigate('more')} className={`flex-1 py-2 rounded-2xl flex flex-col items-center justify-center gap-1 transition-all duration-200 ${activeTab === 'more' ? 'text-violet-300 font-black bg-purple-950/80 border border-purple-800/50 shadow-sm' : 'text-purple-300/70 hover:text-white font-semibold'}`}>
+        {profilePhoto ? <img src={profilePhoto} alt="Мій акаунт" className="w-6 h-6 rounded-full object-cover border border-cyan-300/70" /> : <Menu className="w-5 h-5" />}
+        <span className="text-[11px] leading-none">Мій акаунт</span>
+      </button>
     </div>
   </div>;
 };
