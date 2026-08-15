@@ -41,8 +41,7 @@ header { position:relative; z-index:30; }
 .leaflet-marker-icon.user-location-marker { z-index:100 !important; pointer-events:none !important; }
 .leaflet-marker-icon.custom-listing-marker { z-index:2000 !important; pointer-events:auto !important; touch-action:manipulation !important; }
 
-/* IMPORTANT: the global mobile modal rule used to shrink the map overlay itself to ~24px.
-   The picker has its own explicit viewport layout and must not inherit that constraint. */
+/* Map picker must occupy the full viewport and keep its controls above the footer. */
 .listing-map-overlay { position:fixed !important; inset:0 !important; width:100vw !important; height:100dvh !important; max-height:none !important; min-height:100dvh !important; padding:0 !important; margin:0 !important; overflow:hidden !important; display:flex !important; flex-direction:column !important; z-index:9999 !important; }
 .listing-map-overlay > .listing-map-header { flex:0 0 auto !important; max-height:none !important; }
 .listing-map-overlay > .listing-map-picker { flex:1 1 auto !important; width:100% !important; height:auto !important; min-height:0 !important; max-height:none !important; display:block !important; position:relative !important; overflow:hidden !important; }
@@ -50,12 +49,12 @@ header { position:relative; z-index:30; }
 .listing-map-picker .leaflet-container { width:100% !important; height:100% !important; min-height:0 !important; max-height:none !important; background:#dbeafe !important; }
 .listing-map-overlay .leaflet-tile { width:256px !important; height:256px !important; }
 .listing-map-overlay .leaflet-control-container { position:absolute !important; inset:0 !important; }
+.listing-map-overlay .leaflet-control-zoom { position:absolute !important; top:14px !important; right:14px !important; left:auto !important; bottom:auto !important; margin:0 !important; z-index:2000 !important; }
 
 @media (max-width:640px) {
   .fixed.inset-0:not(.listing-map-overlay) { align-items:flex-end !important; padding:0 !important; }
   .fixed.inset-0:not(.listing-map-overlay) > .relative,.fixed.inset-0:not(.listing-map-overlay) > .w-full { width:100% !important; max-width:100% !important; max-height:calc(100dvh - 8px) !important; margin:0 !important; border-radius:24px 24px 0 0 !important; }
   .fixed.inset-0:not(.listing-map-overlay) > .flex-1 { display:none; }
-  .leaflet-control-zoom { margin-bottom:12px !important; margin-right:12px !important; }
 }
 @media (min-width:641px) { .fixed.inset-0:not(.listing-map-overlay) > .relative,.fixed.inset-0:not(.listing-map-overlay) > .w-full { max-height:calc(100dvh - 32px) !important; } }
 
