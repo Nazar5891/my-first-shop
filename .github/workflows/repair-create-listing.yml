@@ -1,0 +1,27 @@
+name: Repair CreateListingModal
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    if: "!startsWith(github.event.head_commit.message, 'Restore CreateListingModal')"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Restore working CreateListingModal
+        run: |
+          git checkout b7076c56545c7d8c6f724fbc3ebdb66a708d9fa5 -- src/components/CreateListingModal.tsx
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/components/CreateListingModal.tsx
+          git commit -m "Restore CreateListingModal component"
+          git push origin main
