@@ -46,13 +46,20 @@ export const ListingsPanel: React.FC<ListingsPanelProps> = ({ listings, onSelect
     listings.forEach(l => {
       if (l.locationName && l.coordinates && !map.has(l.locationName)) map.set(l.locationName, l.coordinates);
     });
-    return Array.from(map.entries()).map(([name, coords]) => ({ name, coords }));
+    return Array.from(map.entries())
+      .map(([name, coords]) => ({ name, coords }))
+      .sort((a, b) => a.name.localeCompare(b.name, 'uk'));
   }, [listings]);
 
+  // Підказки працюють як у Google: спочатку тільки назви, що ПОЧИНАЮТЬСЯ
+  // з введеного тексту. Регістр та зайві пробіли не мають значення.
   const locationSuggestions = useMemo(() => {
-    const q = locationQuery.trim().toLowerCase();
+    const q = locationQuery.trim().toLocaleLowerCase('uk-UA');
     if (!q) return locations.slice(0, 8);
-    return locations.filter(l => l.name.toLowerCase().includes(q)).slice(0, 8);
+
+    return locations
+      .filter(l => l.name.trim().toLocaleLowerCase('uk-UA').startsWith(q))
+      .slice(0, 8);
   }, [locations, locationQuery]);
 
   const searchCenter = selectedLocationCoords || userCoordinates || null;
@@ -149,7 +156,7 @@ export const ListingsPanel: React.FC<ListingsPanelProps> = ({ listings, onSelect
               </div>
               {openMenu === 'location' && <div className="absolute z-50 left-0 right-0 top-full max-h-64 overflow-y-auto border border-white/10 bg-[#080808] shadow-2xl">
                 <div className="px-3 py-2 text-[8px] uppercase tracking-[0.2em] text-white/25 border-b border-white/5">ПІДКАЗКИ МІСЦЯ</div>
-                {locationSuggestions.length > 0 ? locationSuggestions.map(l => <button key={l.name} type="button" onClick={() => chooseLocation(l.name, l.coords)} className={`w-full px-3 py-3 text-left flex items-center gap-2 text-[11px] border-b border-white/5 hover:bg-white/10 ${selectedLocation === l.name ? 'bg-white text-black font-black' : 'text-white/80'}`}><MapPin className="w-3.5 h-3.5 shrink-0" />{l.name}</button>) : <div className="px-3 py-4 text-[11px] text-white/35">Місце не знайдено серед оголошень.</div>}
+                {locationSuggestions.length > 0 ? locationSuggestions.map(l => <button key={l.name} type="button" onClick={() => chooseLocation(l.name, l.coords)} className={`w-full px-3 py-3 text-left flex items-center gap-2 text-[11px] border-b border-white/5 hover:bg-white/10 ${selectedLocation === l.name ? 'bg-white text-black font-black' : 'text-white/80'}`}><MapPin className="w-3.5 h-3.5 shrink-0" />{l.name}</button>) : <div className="px-3 py-4 text-[11px] text-white/35">Місце з таким початком не знайдено.</div>}
               </div>}
             </div>
 
