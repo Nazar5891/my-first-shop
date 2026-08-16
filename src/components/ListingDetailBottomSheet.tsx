@@ -15,14 +15,14 @@ import {
   Send,
   UserCheck,
   Car,
-  Trash2
+  Trash2,
 } from 'lucide-react';
 
 import {
   Listing,
   CATEGORIES,
   URGENCY_LEVELS_MAP,
-  ListingComment
+  ListingComment,
 } from '../types';
 
 import { formatDistance } from '../utils/distance';
@@ -30,12 +30,11 @@ import { auth, db } from '../firebase';
 
 import {
   collection,
-  deleteDoc,
   doc,
   getDocs,
   query,
   where,
-  writeBatch
+  writeBatch,
 } from 'firebase/firestore';
 
 interface ListingDetailBottomSheetProps {
@@ -60,12 +59,11 @@ export const ListingDetailBottomSheet: React.FC<
   onRoute,
   onReport,
   onAddComment,
-  onDeleted
+  onDeleted,
 }) => {
   const [newAuthorName, setNewAuthorName] = useState('');
   const [newCommentText, setNewCommentText] = useState('');
   const [newRating, setNewRating] = useState<number>(5);
-
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [isDeleting, setIsDeleting] = useState(false);
@@ -73,8 +71,7 @@ export const ListingDetailBottomSheet: React.FC<
   if (!listing) return null;
 
   const cat =
-    CATEGORIES[listing.category] ||
-    CATEGORIES.part_time;
+    CATEGORIES[listing.category] || CATEGORIES.part_time;
 
   const isUrgent = listing.isUrgent;
 
@@ -88,7 +85,7 @@ export const ListingDetailBottomSheet: React.FC<
 
   const isOwner = Boolean(
     auth.currentUser &&
-    listing.authorId === auth.currentUser.uid
+      listing.authorId === auth.currentUser.uid
   );
 
   const isAdmin =
@@ -121,52 +118,39 @@ export const ListingDetailBottomSheet: React.FC<
     setIsSubmitting(true);
 
     try {
-      const ok = await onAddComment(
-        listing.id,
-        {
-          authorName:
-            newAuthorName.trim() ||
-            auth.currentUser?.displayName ||
-            'Мешканець громади',
-
-          text: newCommentText.trim(),
-
-          rating: newRating,
-
-          verifiedUser: true
-        }
-      );
-
-      setIsSubmitting(false);
+      const ok = await onAddComment(listing.id, {
+        authorName:
+          newAuthorName.trim() ||
+          auth.currentUser?.displayName ||
+          'Мешканець громади',
+        text: newCommentText.trim(),
+        rating: newRating,
+        verifiedUser: true,
+      });
 
       if (ok) {
         setNewCommentText('');
         setNewAuthorName('');
-
         setSuccessMessage(
           'Дякуємо! Ваш відгук збережено.'
         );
 
-        setTimeout(
-          () => setSuccessMessage(''),
-          3000
-        );
+        setTimeout(() => {
+          setSuccessMessage('');
+        }, 3000);
       } else {
         setSuccessMessage(
           'Не вдалося зберегти відгук. Перевірте вхід в акаунт та доступ до бази.'
         );
       }
     } catch (error) {
-      console.error(
-        'Помилка додавання відгуку:',
-        error
-      );
-
-      setIsSubmitting(false);
+      console.error(error);
 
       setSuccessMessage(
         'Не вдалося зберегти відгук.'
       );
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -195,21 +179,15 @@ export const ListingDetailBottomSheet: React.FC<
       const commentsSnap = await getDocs(
         query(
           collection(db, 'comments'),
-          where(
-            'listingId',
-            '==',
-            listing.id
-          )
+          where('listingId', '==', listing.id)
         )
       );
 
       const batch = writeBatch(db);
 
-      commentsSnap.docs.forEach(
-        (item) => {
-          batch.delete(item.ref);
-        }
-      );
+      commentsSnap.docs.forEach((item) => {
+        batch.delete(item.ref);
+      });
 
       batch.delete(
         doc(db, 'listings', listing.id)
@@ -218,7 +196,6 @@ export const ListingDetailBottomSheet: React.FC<
       await batch.commit();
 
       onDeleted?.(listing.id);
-
       onClose();
     } catch (error) {
       console.error(
@@ -234,104 +211,52 @@ export const ListingDetailBottomSheet: React.FC<
     }
   };
 
-  const handleShare = () => {
+  const handleShare = async () => {
     const shareData = {
       title: listing.title,
       text: `${listing.title} — ${listing.pay} (Помічник Громада)`,
-      url: window.location.href
+      url: window.location.href,
     };
 
-    if (navigator.share) {
-      navigator
-        .share(shareData)
-        .catch(() => {});
-    } else if (navigator.clipboard) {
-      navigator.clipboard
-        .writeText(window.location.href)
-        .then(() => {
-          alert('Посилання скопійовано!');
-        })
-        .catch(() => {});
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(
+          window.location.href
+        );
+
+        alert('Посилання скопійовано!');
+      }
+    } catch {
+      // Користувач просто закрив вікно поширення
     }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/40 backdrop-blur-[2px] transition-opacity animate-fade-in">
+    <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/40 backdrop-blur-[2px] animate-fade-in">
 
-      {/* Закриття по кліку збоку */}
+      {/* Закриття по фону */}
       <div
         className="flex-1 hidden sm:block cursor-pointer"
         onClick={onClose}
       />
 
-      {/* Основна панель */}
-      <div
-        className="
-          relative
-          w-full
-          sm:w-[420px]
-          md:w-[460px]
-          h-full
-          bg-slate-950/98
-          backdrop-blur-2xl
-          text-slate-100
-          shadow-2xl
-          border-l-2
-          border-purple-600/80
-          overflow-hidden
-          flex
-          flex-col
-          z-10
-          animate-slide-in-right
-        "
-      >
+      {/* ОСНОВНА ПАНЕЛЬ */}
+      <div className="relative w-full sm:w-[420px] md:w-[460px] h-full bg-slate-950/98 backdrop-blur-2xl text-slate-100 shadow-2xl border-l-2 border-purple-600/80 flex flex-col z-10 animate-slide-in-right">
 
-        {/* Верхній індикатор на телефоні */}
-        <div
-          className="
-            w-12
-            h-1.5
-            bg-purple-900/60
-            rounded-full
-            mx-auto
-            my-2
-            shrink-0
-            sm:hidden
-          "
-        />
+        {/* Верхня ручка на телефоні */}
+        <div className="w-12 h-1.5 bg-purple-900/60 rounded-full mx-auto my-2 shrink-0 sm:hidden" />
 
         {/* Верхні кнопки */}
-        <div
-          className="
-            absolute
-            top-3
-            right-3
-            flex
-            items-center
-            gap-1.5
-            z-40
-          "
-        >
+        <div className="absolute top-3 right-3 flex items-center gap-1.5 z-40">
 
           {canDelete && (
             <button
               type="button"
               onClick={handleDelete}
               disabled={isDeleting}
-              className="
-                w-9
-                h-9
-                rounded-full
-                bg-rose-950/90
-                hover:bg-rose-700
-                text-rose-200
-                border
-                border-rose-600/60
-                flex
-                items-center
-                justify-center
-                disabled:opacity-50
-              "
+              className="w-9 h-9 rounded-full bg-rose-950/90 hover:bg-rose-700 text-rose-200 border border-rose-600/60 flex items-center justify-center disabled:opacity-50"
               title={
                 isAdmin && !isOwner
                   ? 'Адмін: видалити оголошення'
@@ -345,19 +270,7 @@ export const ListingDetailBottomSheet: React.FC<
           <button
             type="button"
             onClick={handleShare}
-            className="
-              w-9
-              h-9
-              rounded-full
-              bg-slate-900/90
-              hover:bg-purple-950
-              text-purple-300
-              border
-              border-purple-800/40
-              flex
-              items-center
-              justify-center
-            "
+            className="w-9 h-9 rounded-full bg-slate-900/90 hover:bg-purple-950 text-purple-300 border border-purple-800/40 flex items-center justify-center"
             title="Поділитися"
           >
             <Share2 className="w-4 h-4" />
@@ -366,74 +279,23 @@ export const ListingDetailBottomSheet: React.FC<
           <button
             type="button"
             onClick={onClose}
-            className="
-              w-9
-              h-9
-              rounded-full
-              bg-slate-900/90
-              hover:bg-purple-950
-              text-purple-300
-              border
-              border-purple-800/40
-              flex
-              items-center
-              justify-center
-            "
-            title="Закрити"
+            className="w-9 h-9 rounded-full bg-slate-900/90 hover:bg-purple-950 text-purple-300 border border-purple-800/40 flex items-center justify-center"
           >
             <X className="w-5 h-5" />
           </button>
 
         </div>
 
-        {/* ====================================================== */}
-        {/* ПРОКРУЧУВАНИЙ КОНТЕНТ                                 */}
-        {/* ====================================================== */}
-
-        <div
-          className="
-            flex-1
-            min-h-0
-            overflow-y-auto
-            p-4
-            sm:p-6
-            pb-32
-            space-y-4
-          "
-          style={{
-            WebkitOverflowScrolling: 'touch'
-          }}
-        >
+        {/* =====================================================
+            ПРОКРУЧУВАНИЙ ВМІСТ
+            ===================================================== */}
+        <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6 pb-28 space-y-4">
 
           {/* Термінова допомога */}
           {isUrgent && (
-            <div
-              className="
-                bg-rose-950/80
-                border-2
-                border-rose-600/60
-                rounded-2xl
-                p-3.5
-                flex
-                items-start
-                gap-3
-                text-rose-100
-                shadow-md
-              "
-            >
-              <div
-                className="
-                  w-10
-                  h-10
-                  rounded-xl
-                  bg-rose-600
-                  text-white
-                  flex
-                  items-center
-                  justify-center
-                  shrink-0
-                "
-              >
+            <div className="bg-rose-950/80 border-2 border-rose-600/60 rounded-2xl p-3.5 flex items-start gap-3 text-rose-100 shadow-md">
+
+              <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center shrink-0">
                 <Siren className="w-6 h-6" />
               </div>
 
@@ -444,17 +306,7 @@ export const ListingDetailBottomSheet: React.FC<
                   </span>
 
                   {urgencyInfo && (
-                    <span
-                      className="
-                        bg-rose-600
-                        text-white
-                        text-[10px]
-                        font-black
-                        px-2
-                        py-0.5
-                        rounded-full
-                      "
-                    >
+                    <span className="bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full">
                       {urgencyInfo.label}
                     </span>
                   )}
@@ -464,89 +316,31 @@ export const ListingDetailBottomSheet: React.FC<
                   Будь ласка, допоможіть земляку якнайшвидше!
                 </p>
               </div>
+
             </div>
           )}
 
           {/* Категорія */}
           <div className="flex items-center gap-2 flex-wrap pr-20">
 
-            <span
-              className="
-                inline-flex
-                items-center
-                gap-1
-                px-3
-                py-1
-                rounded-full
-                text-xs
-                font-extrabold
-                border
-                bg-purple-950/80
-                text-purple-200
-                border-purple-800/50
-              "
-            >
+            <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-extrabold border bg-purple-950/80 text-purple-200 border-purple-800/50">
               <span>{cat.pinSymbol}</span>
               <span>{cat.label}</span>
             </span>
 
             {listing.subcategory && (
-              <span
-                className="
-                  inline-flex
-                  items-center
-                  px-2.5
-                  py-1
-                  rounded-full
-                  text-xs
-                  font-bold
-                  bg-slate-900
-                  text-cyan-300
-                  border
-                  border-cyan-800/50
-                "
-              >
+              <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-slate-900 text-cyan-300 border border-cyan-800/50">
                 {listing.subcategory}
               </span>
             )}
 
-            <span
-              className="
-                inline-flex
-                items-center
-                gap-1.5
-                px-3
-                py-1
-                rounded-full
-                text-xs
-                font-bold
-                bg-slate-900/90
-                text-purple-200
-                border
-                border-purple-800/40
-              "
-            >
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-slate-900/90 text-purple-200 border border-purple-800/40">
               <MapPin className="w-3.5 h-3.5 text-purple-400" />
               📍 {formatDistance(listing.distanceMeters)} від вас
             </span>
 
             {listing.verified && (
-              <span
-                className="
-                  inline-flex
-                  items-center
-                  gap-1
-                  px-2.5
-                  py-1
-                  rounded-full
-                  text-[11px]
-                  font-bold
-                  bg-purple-950/60
-                  text-purple-300
-                  border
-                  border-purple-800/50
-                "
-              >
+              <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold bg-purple-950/60 text-purple-300 border border-purple-800/50">
                 <CheckCircle2 className="w-3.5 h-3.5" />
                 Номер перевірено
               </span>
@@ -555,15 +349,7 @@ export const ListingDetailBottomSheet: React.FC<
           </div>
 
           {/* Заголовок */}
-          <h2
-            className="
-              text-xl
-              sm:text-2xl
-              font-black
-              text-slate-100
-              leading-tight
-            "
-          >
+          <h2 className="text-xl sm:text-2xl font-black text-slate-100 leading-tight">
             {listing.title}
           </h2>
 
@@ -572,25 +358,7 @@ export const ListingDetailBottomSheet: React.FC<
             <button
               type="button"
               onClick={() => onRoute(listing)}
-              className="
-                w-full
-                py-3
-                bg-white
-                hover:bg-slate-200
-                active:bg-slate-300
-                text-slate-950
-                font-black
-                text-xs
-                uppercase
-                tracking-wide
-                rounded-xl
-                border
-                border-white
-                flex
-                items-center
-                justify-center
-                gap-2
-              "
+              className="w-full py-3 bg-white hover:bg-slate-200 active:bg-slate-300 text-slate-950 font-black text-xs uppercase tracking-wide rounded-xl border border-white flex items-center justify-center gap-2 shadow-lg"
             >
               <Navigation className="w-4 h-4" />
               Прокласти маршрут
@@ -601,64 +369,22 @@ export const ListingDetailBottomSheet: React.FC<
           {isRideshare &&
             (listing.rideRouteFrom ||
               listing.rideRouteTo) && (
-              <div
-                className="
-                  p-4
-                  bg-gradient-to-br
-                  from-sky-950
-                  to-slate-900
-                  rounded-2xl
-                  border-2
-                  border-sky-500/60
-                  space-y-3
-                "
-              >
+              <div className="p-4 bg-gradient-to-br from-sky-950 to-slate-900 rounded-2xl border-2 border-sky-500/60 space-y-3">
 
                 <div className="flex items-center justify-between">
-
-                  <span
-                    className="
-                      text-xs
-                      font-black
-                      uppercase
-                      text-sky-300
-                      flex
-                      items-center
-                      gap-1.5
-                    "
-                  >
+                  <span className="text-xs font-black uppercase text-sky-300 flex items-center gap-1.5">
                     <Car className="w-4 h-4" />
                     Маршрут поїздки
                   </span>
 
-                  <span
-                    className="
-                      bg-sky-900/80
-                      text-sky-200
-                      text-[11px]
-                      font-bold
-                      px-2.5
-                      py-0.5
-                      rounded-full
-                    "
-                  >
+                  <span className="bg-sky-900/80 text-sky-200 text-[11px] font-bold px-2.5 py-0.5 rounded-full">
                     {listing.rideRole === 'driver'
                       ? '🚗 Водій'
                       : '🙋‍♂️ Пасажир'}
                   </span>
-
                 </div>
 
-                <div
-                  className="
-                    flex
-                    items-center
-                    justify-between
-                    text-sm
-                    font-extrabold
-                    text-sky-100
-                  "
-                >
+                <div className="flex items-center justify-between text-sm font-extrabold text-sky-100">
 
                   <div>
                     <span className="text-[10px] text-sky-400 block">
@@ -685,15 +411,7 @@ export const ListingDetailBottomSheet: React.FC<
                 </div>
 
                 {listing.rideCarInfo && (
-                  <div
-                    className="
-                      text-xs
-                      text-slate-300
-                      bg-slate-950/60
-                      p-2
-                      rounded-xl
-                    "
-                  >
+                  <div className="text-xs text-slate-300 bg-slate-950/60 p-2 rounded-xl">
                     🚘 <strong>Автомобіль:</strong>{' '}
                     {listing.rideCarInfo}
                   </div>
@@ -702,20 +420,7 @@ export const ListingDetailBottomSheet: React.FC<
                 <button
                   type="button"
                   onClick={() => onRoute(listing)}
-                  className="
-                    w-full
-                    py-2
-                    bg-sky-600
-                    hover:bg-sky-500
-                    text-white
-                    font-extrabold
-                    text-xs
-                    rounded-xl
-                    flex
-                    items-center
-                    justify-center
-                    gap-1.5
-                  "
+                  className="w-full py-2 bg-sky-600 hover:bg-sky-500 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5"
                 >
                   <Navigation className="w-3.5 h-3.5" />
                   Показати маршрут на карті
@@ -726,53 +431,20 @@ export const ListingDetailBottomSheet: React.FC<
 
           {/* Фото */}
           {listing.photoUrl && (
-            <div
-              className="
-                w-full
-                rounded-2xl
-                overflow-hidden
-                border
-                border-purple-900/40
-                bg-slate-900
-              "
-            >
+            <div className="w-full rounded-2xl overflow-hidden border border-purple-900/40 bg-slate-900">
               <img
                 src={listing.photoUrl}
                 alt={listing.title}
-                className="
-                  block
-                  w-full
-                  h-auto
-                  max-h-[70vh]
-                  object-contain
-                "
+                className="block w-full h-auto max-h-[70vh] object-contain"
               />
             </div>
           )}
 
-          {/* Коли / тривалість / локація */}
+          {/* Коли / тривалість / місце */}
           <div className="grid grid-cols-2 gap-2.5">
 
-            <div
-              className="
-                bg-slate-900/80
-                p-3
-                rounded-2xl
-                border
-                border-purple-900/40
-              "
-            >
-              <div
-                className="
-                  flex
-                  items-center
-                  gap-1
-                  text-purple-400
-                  text-[11px]
-                  font-bold
-                  uppercase
-                "
-              >
+            <div className="bg-slate-900/80 p-3 rounded-2xl border border-purple-900/40">
+              <div className="flex items-center gap-1 text-purple-400 text-[11px] font-bold uppercase">
                 <Calendar className="w-3.5 h-3.5" />
                 Коли
               </div>
@@ -782,26 +454,8 @@ export const ListingDetailBottomSheet: React.FC<
               </p>
             </div>
 
-            <div
-              className="
-                bg-slate-900/80
-                p-3
-                rounded-2xl
-                border
-                border-purple-900/40
-              "
-            >
-              <div
-                className="
-                  flex
-                  items-center
-                  gap-1
-                  text-purple-400
-                  text-[11px]
-                  font-bold
-                  uppercase
-                "
-              >
+            <div className="bg-slate-900/80 p-3 rounded-2xl border border-purple-900/40">
+              <div className="flex items-center gap-1 text-purple-400 text-[11px] font-bold uppercase">
                 <Clock className="w-3.5 h-3.5" />
                 Тривалість
               </div>
@@ -811,163 +465,62 @@ export const ListingDetailBottomSheet: React.FC<
               </p>
             </div>
 
-            <div
-              className="
-                bg-slate-900/80
-                p-3
-                rounded-2xl
-                border
-                border-purple-900/40
-                col-span-2
-              "
-            >
-              <div
-                className="
-                  flex
-                  items-center
-                  gap-1
-                  text-purple-400
-                  text-[11px]
-                  font-bold
-                  uppercase
-                "
-              >
+            <div className="bg-slate-900/80 p-3 rounded-2xl border border-purple-900/40 col-span-2">
+              <div className="flex items-center gap-1 text-purple-400 text-[11px] font-bold uppercase">
                 <MapPin className="w-3.5 h-3.5" />
                 Локація
               </div>
 
               <p className="font-extrabold text-sm">
-                {listing.locationName}
+                {listing.locationName || 'Локацію не вказано'}
               </p>
             </div>
 
           </div>
 
           {/* Оплата */}
-          <div
-            className="
-              bg-purple-950/70
-              p-4
-              rounded-2xl
-              border
-              border-purple-800/50
-              flex
-              items-center
-              justify-between
-            "
-          >
-            <div>
+          <div className="bg-purple-950/70 p-4 rounded-2xl border border-purple-800/50 flex items-center justify-between">
 
-              <span
-                className="
-                  text-xs
-                  font-bold
-                  text-purple-300
-                  uppercase
-                  block
-                "
-              >
+            <div>
+              <span className="text-xs font-bold text-purple-300 uppercase block">
                 {isRideshare
                   ? 'Ціна поїздки'
                   : 'Винагорода / Оплата'}
               </span>
 
-              <span
-                className="
-                  text-2xl
-                  font-black
-                  text-violet-200
-                "
-              >
+              <span className="text-2xl font-black text-violet-200">
                 {listing.pay}
               </span>
-
             </div>
+
           </div>
 
           {/* Опис */}
           <div>
-
-            <h4
-              className="
-                text-xs
-                font-extrabold
-                text-purple-400
-                uppercase
-              "
-            >
+            <h4 className="text-xs font-extrabold text-purple-400 uppercase mb-1">
               Опис
             </h4>
 
-            <p
-              className="
-                text-sm
-                text-slate-200
-                leading-relaxed
-                whitespace-pre-line
-                bg-slate-900/60
-                p-3.5
-                rounded-2xl
-                border
-                border-purple-900/30
-              "
-            >
+            <p className="text-sm text-slate-200 leading-relaxed whitespace-pre-line bg-slate-900/60 p-3.5 rounded-2xl border border-purple-900/30">
               {listing.description}
             </p>
-
           </div>
 
-          {/* Відгуки */}
-          <div
-            className="
-              p-4
-              bg-slate-900/90
-              rounded-2xl
-              border
-              border-purple-800/40
-              space-y-3
-            "
-          >
+          {/* ВІДГУКИ */}
+          <div className="p-4 bg-slate-900/90 rounded-2xl border border-purple-800/40 space-y-3">
 
-            <div
-              className="
-                flex
-                items-center
-                justify-between
-                border-b
-                border-purple-900/40
-                pb-2
-              "
-            >
+            <div className="flex items-center justify-between border-b border-purple-900/40 pb-2">
 
               <div className="flex items-center gap-2">
-
                 <MessageSquare className="w-4 h-4 text-cyan-400" />
 
-                <span
-                  className="
-                    text-xs
-                    font-extrabold
-                    uppercase
-                    text-slate-100
-                  "
-                >
+                <span className="text-xs font-extrabold uppercase text-slate-100">
                   Відгуки громади ({commentsList.length})
                 </span>
-
               </div>
 
               {listing.rating && (
-                <div
-                  className="
-                    flex
-                    items-center
-                    gap-1
-                    text-amber-300
-                    text-xs
-                    font-extrabold
-                  "
-                >
+                <div className="flex items-center gap-1 text-amber-300 text-xs font-extrabold">
                   <Star className="w-3.5 h-3.5 fill-amber-400" />
                   {listing.rating.toFixed(1)}
                 </div>
@@ -975,159 +528,78 @@ export const ListingDetailBottomSheet: React.FC<
 
             </div>
 
+            {/* Список відгуків */}
             {commentsList.length === 0 ? (
-
-              <p
-                className="
-                  text-xs
-                  text-purple-300/60
-                  italic
-                "
-              >
+              <p className="text-xs text-purple-300/60 italic">
                 Поки що немає відгуків.
               </p>
-
             ) : (
+              <div className="space-y-2.5 max-h-56 overflow-y-auto">
 
-              <div
-                className="
-                  space-y-2.5
-                  max-h-56
-                  overflow-y-auto
-                "
-              >
+                {commentsList.map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-3 bg-slate-950/80 rounded-xl border border-purple-900/30 text-xs"
+                  >
 
-                {commentsList.map(
-                  (item) => (
-                    <div
-                      key={item.id}
-                      className="
-                        p-3
-                        bg-slate-950/80
-                        rounded-xl
-                        border
-                        border-purple-900/30
-                        text-xs
-                      "
-                    >
+                    <div className="flex items-center justify-between">
 
-                      <div
-                        className="
-                          flex
-                          items-center
-                          justify-between
-                        "
-                      >
+                      <div className="flex items-center gap-1.5">
 
-                        <div
-                          className="
-                            flex
-                            items-center
-                            gap-1.5
-                          "
-                        >
+                        <span className="font-extrabold text-purple-200">
+                          {item.authorName}
+                        </span>
 
-                          <span
-                            className="
-                              font-extrabold
-                              text-purple-200
-                            "
-                          >
-                            {item.authorName}
+                        {item.verifiedUser && (
+                          <span className="text-[10px] text-emerald-400">
+                            <UserCheck className="w-3 h-3 inline" />{' '}
+                            Підтверджено
                           </span>
-
-                          {item.verifiedUser && (
-                            <span
-                              className="
-                                text-[10px]
-                                text-emerald-400
-                              "
-                            >
-                              <UserCheck className="w-3 h-3 inline" />
-                              {' '}Підтверджено
-                            </span>
-                          )}
-
-                        </div>
-
-                        {item.rating && (
-                          <div className="flex text-amber-400">
-                            {[...Array(item.rating)].map(
-                              (_, i) => (
-                                <Star
-                                  key={i}
-                                  className="
-                                    w-3
-                                    h-3
-                                    fill-amber-400
-                                  "
-                                />
-                              )
-                            )}
-                          </div>
                         )}
 
                       </div>
 
-                      <p className="text-slate-200 mt-1">
-                        {item.text}
-                      </p>
-
-                      <span
-                        className="
-                          text-[10px]
-                          text-purple-300/50
-                          block
-                          text-right
-                        "
-                      >
-                        {item.createdAt}
-                      </span>
+                      {item.rating && (
+                        <div className="flex text-amber-400">
+                          {[...Array(item.rating)].map(
+                            (_, i) => (
+                              <Star
+                                key={i}
+                                className="w-3 h-3 fill-amber-400"
+                              />
+                            )
+                          )}
+                        </div>
+                      )}
 
                     </div>
-                  )
-                )}
+
+                    <p className="text-slate-200 mt-1">
+                      {item.text}
+                    </p>
+
+                    <span className="text-[10px] text-purple-300/50 block text-right">
+                      {item.createdAt}
+                    </span>
+
+                  </div>
+                ))}
 
               </div>
-
             )}
 
-            {/* Форма відгуку */}
+            {/* Додати відгук */}
             <form
               onSubmit={handleSubmitComment}
-              className="
-                pt-2
-                border-t
-                border-purple-900/40
-                space-y-2
-              "
+              className="pt-2 border-t border-purple-900/40 space-y-2"
             >
 
-              <span
-                className="
-                  text-[11px]
-                  font-extrabold
-                  text-cyan-300
-                  block
-                  uppercase
-                "
-              >
+              <span className="text-[11px] font-extrabold text-cyan-300 block uppercase">
                 Залишити свій відгук
               </span>
 
               {successMessage && (
-                <div
-                  className="
-                    p-2
-                    bg-slate-950
-                    text-cyan-200
-                    border
-                    border-cyan-800
-                    text-xs
-                    rounded-xl
-                    font-bold
-                  "
-                >
+                <div className="p-2 bg-slate-950 text-cyan-200 border border-cyan-800 text-xs rounded-xl font-bold">
                   {successMessage}
                 </div>
               )}
@@ -1141,55 +613,28 @@ export const ListingDetailBottomSheet: React.FC<
                   onChange={(e) =>
                     setNewAuthorName(e.target.value)
                   }
-                  className="
-                    px-2.5
-                    py-1.5
-                    bg-slate-950
-                    text-slate-100
-                    text-xs
-                    rounded-xl
-                    border
-                    border-purple-800/50
-                  "
+                  className="px-2.5 py-1.5 bg-slate-950 text-slate-100 text-xs rounded-xl border border-purple-800/50"
                 />
 
-                <div
-                  className="
-                    flex
-                    items-center
-                    gap-1
-                    justify-end
-                    px-2
-                    bg-slate-950
-                    rounded-xl
-                    border
-                    border-purple-800/50
-                  "
-                >
-                  {[1, 2, 3, 4, 5].map(
-                    (star) => (
-                      <button
-                        key={star}
-                        type="button"
-                        onClick={() =>
-                          setNewRating(star)
-                        }
-                        className="p-0.5"
-                      >
-                        <Star
-                          className={`
-                            w-3.5
-                            h-3.5
-                            ${
-                              star <= newRating
-                                ? 'fill-amber-400 text-amber-400'
-                                : 'text-slate-600'
-                            }
-                          `}
-                        />
-                      </button>
-                    )
-                  )}
+                <div className="flex items-center gap-1 justify-end px-2 bg-slate-950 rounded-xl border border-purple-800/50">
+
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      onClick={() => setNewRating(star)}
+                      className="p-0.5"
+                    >
+                      <Star
+                        className={`w-3.5 h-3.5 ${
+                          star <= newRating
+                            ? 'fill-amber-400 text-amber-400'
+                            : 'text-slate-600'
+                        }`}
+                      />
+                    </button>
+                  ))}
+
                 </div>
 
               </div>
@@ -1201,18 +646,7 @@ export const ListingDetailBottomSheet: React.FC<
                 }
                 placeholder="Ваш відгук..."
                 rows={3}
-                className="
-                  w-full
-                  px-3
-                  py-2
-                  bg-slate-950
-                  text-slate-100
-                  text-xs
-                  rounded-xl
-                  border
-                  border-purple-800/50
-                  resize-none
-                "
+                className="w-full px-3 py-2 bg-slate-950 text-slate-100 text-xs rounded-xl border border-purple-800/50 resize-none"
               />
 
               <button
@@ -1221,21 +655,7 @@ export const ListingDetailBottomSheet: React.FC<
                   isSubmitting ||
                   !newCommentText.trim()
                 }
-                className="
-                  w-full
-                  py-2
-                  bg-cyan-600
-                  hover:bg-cyan-500
-                  disabled:opacity-40
-                  text-white
-                  font-extrabold
-                  text-xs
-                  rounded-xl
-                  flex
-                  items-center
-                  justify-center
-                  gap-1.5
-                "
+                className="w-full py-2 bg-cyan-600 hover:bg-cyan-500 disabled:opacity-40 text-white font-extrabold text-xs rounded-xl flex items-center justify-center gap-1.5"
               >
                 <Send className="w-3.5 h-3.5" />
 
@@ -1248,87 +668,31 @@ export const ListingDetailBottomSheet: React.FC<
 
           </div>
 
-          {/* Додатковий відступ, щоб останній контент не ховався */}
-          <div className="h-4 shrink-0" />
-
         </div>
 
-        {/* ====================================================== */}
-        {/* ФІКСОВАНА НИЖНЯ ПАНЕЛЬ                                */}
-        {/* ====================================================== */}
-
-        <div
-          className="
-            absolute
-            bottom-0
-            left-0
-            right-0
-            z-50
-            p-3
-            pb-[calc(0.75rem+env(safe-area-inset-bottom))]
-            bg-slate-950/98
-            backdrop-blur-xl
-            border-t-2
-            border-purple-600/60
-            shadow-[0_-10px_30px_rgba(0,0,0,0.55)]
-          "
-        >
+        {/* =====================================================
+            НИЖНЯ ФІКСОВАНА ПАНЕЛЬ
+            ===================================================== */}
+        <div className="shrink-0 p-3 bg-slate-950/98 backdrop-blur-xl border-t-2 border-purple-700/70 shadow-[0_-8px_30px_rgba(0,0,0,0.65)] z-50">
 
           <div className="grid grid-cols-2 gap-2">
 
-            {/* ЗАТЕЛЕФОНУВАТИ */}
             <button
               type="button"
               onClick={() => onCall(listing)}
-              className="
-                min-h-[52px]
-                py-3.5
-                px-3
-                bg-emerald-600
-                hover:bg-emerald-500
-                active:bg-emerald-700
-                text-white
-                font-black
-                rounded-xl
-                flex
-                items-center
-                justify-center
-                gap-2
-                shadow-lg
-                border
-                border-emerald-400/30
-                text-sm
-              "
+              className="py-3.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white font-black rounded-xl flex items-center justify-center gap-2 shadow-lg"
             >
-              <Phone className="w-5 h-5 shrink-0" />
-              <span>Зателефонувати</span>
+              <Phone className="w-5 h-5" />
+              Зателефонувати
             </button>
 
-            {/* ПОСКАРЖИТИСЯ */}
             <button
               type="button"
               onClick={() => onReport(listing)}
-              className="
-                min-h-[52px]
-                py-3.5
-                px-3
-                bg-slate-900
-                hover:bg-rose-950
-                active:bg-rose-900
-                text-rose-300
-                font-black
-                rounded-xl
-                border
-                border-rose-700/60
-                flex
-                items-center
-                justify-center
-                gap-2
-                text-sm
-              "
+              className="py-3.5 bg-slate-900 hover:bg-rose-950 active:bg-rose-900 text-rose-300 font-black rounded-xl border border-rose-700/60 flex items-center justify-center gap-2 shadow-lg"
             >
-              <Flag className="w-5 h-5 shrink-0" />
-              <span>Поскаржитися</span>
+              <Flag className="w-5 h-5" />
+              Поскаржитися
             </button>
 
           </div>
