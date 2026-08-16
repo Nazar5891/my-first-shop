@@ -22,6 +22,34 @@
   -webkit-backdrop-filter: blur(8px) saturate(125%) !important;
 }
 
+/* Create-listing modal: same glass treatment as the Listings window. */
+#root .fixed.inset-0 > div > div {
+  background: rgba(10,12,14,.20) !important;
+  border-color: rgba(235,240,245,.40) !important;
+  box-shadow: 0 14px 40px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.16) !important;
+  backdrop-filter: blur(8px) saturate(125%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(125%) !important;
+}
+#root .fixed.inset-0 > div > div > div:first-child {
+  background: rgba(8,10,12,.20) !important;
+  border-color: rgba(235,240,245,.28) !important;
+}
+#root .fixed.inset-0 > div > div > div:nth-child(2) {
+  background: transparent !important;
+}
+#root .fixed.inset-0 > div > div input,
+#root .fixed.inset-0 > div > div textarea,
+#root .fixed.inset-0 > div > div select,
+#root .fixed.inset-0 > div > div button {
+  backdrop-filter: blur(6px) saturate(120%) !important;
+  -webkit-backdrop-filter: blur(6px) saturate(120%) !important;
+}
+#root .fixed.inset-0 > div > div input,
+#root .fixed.inset-0 > div > div textarea,
+#root .fixed.inset-0 > div > div select {
+  background-color: rgba(5,7,9,.28) !important;
+}
+
 /* Listings page: remove its hard black background so the photo remains visible. */
 #root section.h-full.w-full.overflow-hidden {
   background: rgba(8,8,10,.18) !important;
@@ -55,14 +83,16 @@ body::before {
 }
 .cosmic-glass-panel::before,
 .cosmic-glass-card::before,
-#root [role="dialog"]::before {
+#root [role="dialog"]::before,
+#root .fixed.inset-0 > div > div::before {
   content:''; position:absolute; inset:0; pointer-events:none;
   border:1px solid rgba(255,255,255,.10);
   clip-path:polygon(0 0,96% 0,100% 12%,100% 100%,4% 100%,0 88%);
 }
 .cosmic-glass-panel::after,
 .cosmic-glass-card::after,
-#root [role="dialog"]::after {
+#root [role="dialog"]::after,
+#root .fixed.inset-0 > div > div::after {
   content:''; position:absolute; width:30px; height:1px; right:14px; top:10px;
   background:rgba(225,235,240,.65); box-shadow:-42px 0 rgba(225,235,240,.22); pointer-events:none;
 }
