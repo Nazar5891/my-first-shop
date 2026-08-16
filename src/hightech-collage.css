@@ -7,20 +7,43 @@
   background-attachment: fixed !important;
 }
 
-/* Transparent glass windows. MAP IS EXCLUDED. */
-.cosmic-bg-overlay { background: rgba(0,0,0,.10) !important; backdrop-filter:none !important; }
+/* Real application windows: transparent glass. MAP IS EXCLUDED. */
+.cosmic-bg-overlay { background: rgba(0,0,0,.08) !important; backdrop-filter:none !important; }
 .cosmic-glass-panel,
-.cosmic-glass-card {
-  background: rgba(12,12,14,.22) !important;
-  border: 1px solid rgba(235,240,245,.42) !important;
-  box-shadow: 0 14px 40px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.18) !important;
-  backdrop-filter: blur(7px) saturate(125%) !important;
-  -webkit-backdrop-filter: blur(7px) saturate(125%) !important;
+.cosmic-glass-card,
+#root section:not(.leaflet-container),
+#root header:not(.leaflet-control),
+#root [role="dialog"],
+#root [class*="fixed"][class*="inset"]:not(.leaflet-container) {
+  background: rgba(10,12,14,.20) !important;
+  border-color: rgba(235,240,245,.40) !important;
+  box-shadow: 0 14px 40px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.16) !important;
+  backdrop-filter: blur(8px) saturate(125%) !important;
+  -webkit-backdrop-filter: blur(8px) saturate(125%) !important;
 }
 
-/* Keep map unchanged/opaque. */
+/* Listings page: remove its hard black background so the photo remains visible. */
+#root section.h-full.w-full.overflow-hidden {
+  background: rgba(8,8,10,.18) !important;
+}
+#root section.h-full.w-full.overflow-hidden > header {
+  background: rgba(8,8,10,.20) !important;
+}
+#root section.h-full.w-full.overflow-hidden input,
+#root section.h-full.w-full.overflow-hidden button,
+#root section.h-full.w-full.overflow-hidden [class*="bg-[#050505]"],
+#root section.h-full.w-full.overflow-hidden [class*="bg-[#080808]"],
+#root section.h-full.w-full.overflow-hidden [class*="bg-[#0a0a0a]"] {
+  background-color: rgba(5,7,9,.28) !important;
+}
+
+/* Keep the map itself unchanged. */
+.leaflet-container,
+.leaflet-container * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
 .leaflet-container { background:#101214 !important; }
-.leaflet-container, .leaflet-container * { backdrop-filter:none !important; -webkit-backdrop-filter:none !important; }
 
 /* High-tech architectural lines. */
 body::before {
@@ -31,13 +54,15 @@ body::before {
     linear-gradient(0deg, transparent 0 86%, rgba(220,230,235,.18) 86.1%, transparent 86.25%);
 }
 .cosmic-glass-panel::before,
-.cosmic-glass-card::before {
+.cosmic-glass-card::before,
+#root [role="dialog"]::before {
   content:''; position:absolute; inset:0; pointer-events:none;
   border:1px solid rgba(255,255,255,.10);
   clip-path:polygon(0 0,96% 0,100% 12%,100% 100%,4% 100%,0 88%);
 }
 .cosmic-glass-panel::after,
-.cosmic-glass-card::after {
+.cosmic-glass-card::after,
+#root [role="dialog"]::after {
   content:''; position:absolute; width:30px; height:1px; right:14px; top:10px;
   background:rgba(225,235,240,.65); box-shadow:-42px 0 rgba(225,235,240,.22); pointer-events:none;
 }
