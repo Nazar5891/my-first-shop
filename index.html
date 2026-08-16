@@ -12,9 +12,29 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+      .contact-call-highlight { border: 2px solid rgb(16 185 129 / .9) !important; background: rgb(6 78 59 / .38) !important; box-shadow: 0 0 22px rgb(16 185 129 / .28), inset 0 0 18px rgb(16 185 129 / .08) !important; }
+      .contact-call-highlight .contact-call-title { color: rgb(110 231 183) !important; font-size: 12px !important; font-weight: 900 !important; text-transform: uppercase !important; letter-spacing: .06em !important; }
+    </style>
   </head>
   <body class="h-full font-sans antialiased text-slate-100 bg-slate-950 selection:bg-yellow-400 selection:text-slate-950">
     <div id="root" class="h-full"></div>
+    <script>
+      (() => {
+        const fixContactLabel = () => {
+          document.querySelectorAll('#root *').forEach((el) => {
+            if (el.children.length === 0 && el.textContent?.trim() === 'Контактний номер') {
+              el.textContent = 'Подзвонити';
+              el.classList.add('contact-call-title');
+              const box = el.parentElement;
+              if (box) box.classList.add('contact-call-highlight');
+            }
+          });
+        };
+        new MutationObserver(fixContactLabel).observe(document.getElementById('root'), { childList: true, subtree: true, characterData: true });
+        fixContactLabel();
+      })();
+    </script>
     <script src="/photo-viewer.js?v=4"></script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
