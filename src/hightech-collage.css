@@ -1,0 +1,79 @@
+/* PREMIUM COLLAGE / HIGH-TECH VISUAL SKIN
+   Design only. No layout or application logic is changed. */
+
+/* The collage is intentionally referenced as a local asset.
+   Put the supplied photo at /bg-small.jpg in the published root. */
+#root > div:first-child {
+  background-image: url('/bg-small.jpg') !important;
+  background-size: cover !important;
+  background-position: center top !important;
+  background-repeat: no-repeat !important;
+  background-attachment: fixed !important;
+}
+
+/* Remove the old opaque cosmic veil. Keep content readable through glass panels. */
+.cosmic-bg-overlay {
+  background: linear-gradient(180deg, rgba(0,0,0,.18), rgba(0,0,0,.34)) !important;
+  backdrop-filter: blur(0px) !important;
+  -webkit-backdrop-filter: blur(0px) !important;
+}
+
+/* High-tech architectural line language. */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+  opacity: .34;
+  background:
+    linear-gradient(90deg, transparent 0 8%, rgba(220,230,235,.20) 8.1%, transparent 8.25%),
+    linear-gradient(90deg, transparent 0 92%, rgba(220,230,235,.14) 92.1%, transparent 92.25%),
+    linear-gradient(0deg, transparent 0 86%, rgba(220,230,235,.16) 86.1%, transparent 86.25%);
+}
+
+/* Fine technical frame around major UI surfaces without changing their size. */
+.cosmic-glass-panel,
+.cosmic-glass-card {
+  position: relative;
+  overflow: hidden;
+  background: rgba(8,10,12,.68) !important;
+  border: 1px solid rgba(190,205,214,.34) !important;
+  box-shadow: 0 18px 45px rgba(0,0,0,.52), inset 0 1px 0 rgba(255,255,255,.08) !important;
+}
+
+.cosmic-glass-panel::before,
+.cosmic-glass-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 1px solid rgba(255,255,255,.045);
+  clip-path: polygon(0 0, 96% 0, 100% 12%, 100% 100%, 4% 100%, 0 88%);
+}
+
+/* Small luminous corner cuts — high-tech, but restrained. */
+.cosmic-glass-panel::after,
+.cosmic-glass-card::after {
+  content: '';
+  position: absolute;
+  width: 28px;
+  height: 1px;
+  right: 14px;
+  top: 10px;
+  background: rgba(220,230,235,.55);
+  box-shadow: -38px 0 0 rgba(220,230,235,.18);
+  pointer-events: none;
+}
+
+/* Keep the map visually separate from the collage skin. */
+.leaflet-container {
+  background: #101214 !important;
+}
+
+/* Avoid the old monochrome skin making the premium frame look flat. */
+[class*='border-purple-'],
+[class*='border-violet-'],
+[class*='border-indigo-'] {
+  border-color: rgba(190,205,214,.28) !important;
+}
