@@ -16,7 +16,6 @@ header { position:relative; z-index:30; }
 .fixed.inset-0 .overflow-y-auto { overscroll-behavior:contain; -webkit-overflow-scrolling:touch; }
 .fixed.bottom-0 { z-index:5000 !important; }
 
-/* POLISSYA NEXUS — Minimal Gothic / Technology / Monochrome */
 .cosmic-bg-overlay { background:radial-gradient(circle at 50% 10%,rgba(255,255,255,.045),transparent 52%),radial-gradient(circle at 80% 85%,rgba(255,255,255,.025),transparent 45%),rgba(5,5,5,.94); }
 .cosmic-glass-panel { background:rgba(10,10,10,.88); backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px); border:1px solid rgba(255,255,255,.13); box-shadow:0 8px 32px rgba(0,0,0,.7); }
 .cosmic-glass-card { background:rgba(14,14,14,.88); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); border:1px solid rgba(255,255,255,.11); box-shadow:0 4px 20px rgba(0,0,0,.6); }
@@ -24,7 +23,6 @@ header { position:relative; z-index:30; }
 .cosmic-glow-purple { box-shadow:0 0 20px rgba(255,255,255,.12); }
 .cosmic-glow-red { box-shadow:0 0 20px rgba(255,255,255,.16); }
 
-/* Global monochrome override for existing Tailwind UI utilities. */
 [class*="purple-"],[class*="violet-"],[class*="indigo-"] { --tw-gradient-from:#171717 !important; --tw-gradient-to:#050505 !important; --tw-gradient-stops:#171717,#050505 !important; }
 [class*="text-purple-"],[class*="text-violet-"],[class*="text-indigo-"] { color:#e5e5e5 !important; }
 [class*="border-purple-"],[class*="border-violet-"],[class*="border-indigo-"] { border-color:rgba(255,255,255,.16) !important; }
@@ -36,10 +34,10 @@ header { position:relative; z-index:30; }
 [class*="border-cyan-"],[class*="border-rose-"],[class*="border-pink-"] { border-color:rgba(255,255,255,.16) !important; }
 [class*="bg-cyan-"],[class*="bg-rose-"],[class*="bg-pink-"] { background-color:#111 !important; }
 
-/* Listings search action: keep the right-side ПОШУК button visible on mobile. */
+/* Listings search action: white text on the right-side ПОШУК button. */
 header > div:nth-of-type(2) > button {
   background:#ffffff !important;
-  color:#050505 !important;
+  color:#ffffff !important;
   border:2px solid #ffffff !important;
   opacity:1 !important;
   visibility:visible !important;
@@ -50,9 +48,8 @@ header > div:nth-of-type(2) > button {
   overflow:visible !important;
   z-index:5 !important;
 }
-header > div:nth-of-type(2) > button:hover { background:#f1f5f9 !important; color:#050505 !important; }
+header > div:nth-of-type(2) > button:hover { background:#111111 !important; color:#ffffff !important; }
 
-/* Subtle technical line/grid texture */
 body::before { content:""; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.035; background-image:linear-gradient(rgba(255,255,255,.35) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.35) 1px,transparent 1px); background-size:32px 32px; mask-image:linear-gradient(to bottom,black,transparent 75%); }
 
 .leaflet-container { width:100%; height:100%; min-height:420px; z-index:1; background:#111 !important; font-family:inherit; }
