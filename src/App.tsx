@@ -20,6 +20,7 @@ import { ListingsPanel } from './components/ListingsPanel';
 
 const ADMIN_EMAIL = 'nazar0111111@gmail.com';
 const LISTING_LIFETIME_MS = 7 * 24 * 60 * 60 * 1000;
+const SITE_BACKGROUND = 'https://maister-online.github.io/file_00000000a620820a8b40819f1d54434c.jpg';
 
 export default function App() {
   const [remoteListings, setRemoteListings] = useState<Listing[]>([]);
@@ -133,8 +134,8 @@ export default function App() {
   const handleStartOnlineNavigation = (listing: Listing) => { setDetailListing(null); setRoutingListing(null); setSelectedListing(listing); setActiveNavigationListing(listing); setActiveTab('map'); };
   const handleFindOnMap = (listing: Listing) => { setDetailListing(null); setRoutingListing(null); setSelectedListing(listing); setActiveNavigationListing(null); setActiveTab('map'); };
 
-  return <div className="h-full min-h-screen flex flex-col bg-[url('https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?q=80&w=2000&auto=format&fit=crop')] bg-cover bg-center bg-fixed text-slate-100 font-sans selection:bg-purple-600 selection:text-white relative">
-    <div className="absolute inset-0 bg-slate-950/85 backdrop-blur-[2px] pointer-events-none z-0 cosmic-bg-overlay"/>
+  return <div className="h-full min-h-screen flex flex-col bg-cover bg-center bg-fixed text-slate-100 font-sans selection:bg-purple-600 selection:text-white relative" style={{ backgroundImage: `url("${SITE_BACKGROUND}")` }}>
+    <div className="absolute inset-0 bg-slate-950/82 backdrop-blur-[2px] pointer-events-none z-0 cosmic-bg-overlay"/>
     <div className="relative z-10 h-full min-h-screen flex flex-col">
       <Header searchQuery={searchQuery} setSearchQuery={setSearchQuery} selectedCategory={selectedCategory} setSelectedCategory={setSelectedCategory} selectedSubcategory={selectedSubcategory} setSelectedSubcategory={setSelectedSubcategory} isNearMeActive={isNearMeActive} setIsNearMeActive={active=>{setIsNearMeActive(active);if(active)setActiveTab('near');}} urgentCount={urgentCount} totalListingsCount={processedListings.length}/>
       <main className="flex-1 relative overflow-hidden flex flex-col min-h-0">
