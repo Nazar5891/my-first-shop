@@ -1,6 +1,7 @@
 import React, { ErrorInfo, Suspense, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import './index.css';
+import './hightech-collage.css';
 import { CATEGORIES } from './types';
 import { SUBCATEGORY_OVERRIDES } from './data/subcategories';
 
