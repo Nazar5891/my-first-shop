@@ -36,6 +36,22 @@ header { position:relative; z-index:30; }
 [class*="border-cyan-"],[class*="border-rose-"],[class*="border-pink-"] { border-color:rgba(255,255,255,.16) !important; }
 [class*="bg-cyan-"],[class*="bg-rose-"],[class*="bg-pink-"] { background-color:#111 !important; }
 
+/* Listings search action: keep the right-side ПОШУК button visible on mobile. */
+header > div:nth-of-type(2) > button {
+  background:#ffffff !important;
+  color:#050505 !important;
+  border:2px solid #ffffff !important;
+  opacity:1 !important;
+  visibility:visible !important;
+  display:flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  text-indent:0 !important;
+  overflow:visible !important;
+  z-index:5 !important;
+}
+header > div:nth-of-type(2) > button:hover { background:#f1f5f9 !important; color:#050505 !important; }
+
 /* Subtle technical line/grid texture */
 body::before { content:""; position:fixed; inset:0; pointer-events:none; z-index:0; opacity:.035; background-image:linear-gradient(rgba(255,255,255,.35) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.35) 1px,transparent 1px); background-size:32px 32px; mask-image:linear-gradient(to bottom,black,transparent 75%); }
 
