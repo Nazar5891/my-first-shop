@@ -7,19 +7,55 @@
   background-attachment: fixed !important;
 }
 
-/* Real application windows: transparent glass. MAP IS EXCLUDED. */
-.cosmic-bg-overlay { background: rgba(0,0,0,.08) !important; backdrop-filter:none !important; }
+/* Головний фон — саме завантажений колаж, без розмиття. */
+.cosmic-bg-overlay {
+  background: rgba(0,0,0,.16) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Скляний стиль для панелей, але без розмиття головного фону. */
 .cosmic-glass-panel,
 .cosmic-glass-card,
-#root section:not(.leaflet-container),
-#root header:not(.leaflet-control),
 #root [role="dialog"],
 #root [class*="fixed"][class*="inset"]:not(.leaflet-container) {
-  background: rgba(10,12,14,.20) !important;
+  background: rgba(10,12,14,.22) !important;
   border-color: rgba(235,240,245,.40) !important;
   box-shadow: 0 14px 40px rgba(0,0,0,.30), inset 0 1px 0 rgba(255,255,255,.16) !important;
-  backdrop-filter: blur(8px) saturate(125%) !important;
-  -webkit-backdrop-filter: blur(8px) saturate(125%) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Оголошення: кожна картка окрема, темна й чітка — без blur фону під нею. */
+#root section.h-full.w-full.overflow-hidden {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+#root section.h-full.w-full.overflow-hidden > header {
+  background: rgba(8,10,12,.74) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+#root section.h-full.w-full.overflow-hidden article {
+  background: rgba(8,8,8,.94) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-color: rgba(255,255,255,.78) !important;
+  box-shadow: 0 10px 30px rgba(0,0,0,.42) !important;
+}
+#root section.h-full.w-full.overflow-hidden article:hover {
+  background: rgba(10,10,10,.97) !important;
+}
+
+/* Пошук у розділі оголошень — чіткий, без blur. */
+#root section.h-full.w-full.overflow-hidden input,
+#root section.h-full.w-full.overflow-hidden button {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+#root section.h-full.w-full.overflow-hidden input {
+  background: rgba(5,7,9,.94) !important;
 }
 
 /* Create-listing modal: same glass treatment as the Listings window. */
@@ -47,21 +83,6 @@
 #root .fixed.inset-0 > div > div input,
 #root .fixed.inset-0 > div > div textarea,
 #root .fixed.inset-0 > div > div select {
-  background-color: rgba(5,7,9,.28) !important;
-}
-
-/* Listings page: remove its hard black background so the photo remains visible. */
-#root section.h-full.w-full.overflow-hidden {
-  background: rgba(8,8,10,.18) !important;
-}
-#root section.h-full.w-full.overflow-hidden > header {
-  background: rgba(8,8,10,.20) !important;
-}
-#root section.h-full.w-full.overflow-hidden input,
-#root section.h-full.w-full.overflow-hidden button,
-#root section.h-full.w-full.overflow-hidden [class*="bg-[#050505]"],
-#root section.h-full.w-full.overflow-hidden [class*="bg-[#080808]"],
-#root section.h-full.w-full.overflow-hidden [class*="bg-[#0a0a0a]"] {
   background-color: rgba(5,7,9,.28) !important;
 }
 
