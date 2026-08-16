@@ -15,7 +15,7 @@ export const ListingCard: React.FC<ListingCardProps> = ({ listing, onClick, onCa
   const openOnMap = (e: React.MouseEvent) => { e.stopPropagation(); window.dispatchEvent(new CustomEvent('meister-open-map-listing', { detail: listing })); };
 
   return (
-    <article onClick={onClick} className={`group cursor-pointer overflow-hidden bg-[#080808]/80 backdrop-blur-sm transition-all duration-200 ${isUrgent ? 'border-2 border-white' : isSelected ? 'border-2 border-cyan-300 ring-1 ring-cyan-300/50' : 'border border-cyan-400/40 hover:border-cyan-300 hover:shadow-[0_0_18px_rgba(34,211,238,0.18)]'} ${variant === 'horizontal' ? 'w-72 sm:w-80 shrink-0' : 'w-full'}`}>
+    <article onClick={onClick} className={`group cursor-pointer overflow-hidden bg-[#080808]/80 backdrop-blur-sm transition-all duration-200 border-2 ${isUrgent ? 'border-white shadow-[0_0_14px_rgba(255,255,255,0.16)]' : isSelected ? 'border-cyan-300 ring-1 ring-cyan-300/60 shadow-[0_0_18px_rgba(34,211,238,0.22)]' : 'border-cyan-400/60 hover:border-cyan-200 hover:shadow-[0_0_20px_rgba(34,211,238,0.22)]'} ${variant === 'horizontal' ? 'w-72 sm:w-80 shrink-0' : 'w-full'}`}>
       <div className="relative">
         {listing.photoUrl ? (
           <div className="relative h-28 sm:h-36 overflow-hidden bg-[#0c0c0c]">
